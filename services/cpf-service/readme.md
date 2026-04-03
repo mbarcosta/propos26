@@ -17,7 +17,7 @@ Este documento descreve **passo a passo**, desde a criação do projeto no Eclip
 ---
 ## Arquitetura
 
-![Arquitetura do CPF Service](../../docs/images/cpf-service-architecture.png)
+![Arquitetura do CPF Service](../../docs/images/arquitetura-cpf-service.png)
 
 # 2. Criação do projeto no Eclipse
 
