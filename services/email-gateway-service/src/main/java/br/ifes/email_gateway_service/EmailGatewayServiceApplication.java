@@ -1,10 +1,10 @@
 package br.ifes.email_gateway_service;
 
-import br.ifes.email_gateway_service.service.EmailPollingService;
-import org.springframework.boot.CommandLineRunner;
+//import br.ifes.email_gateway_service.service.EmailPollingService;
+//import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
+//import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class EmailGatewayServiceApplication {
@@ -13,7 +13,7 @@ public class EmailGatewayServiceApplication {
         SpringApplication.run(EmailGatewayServiceApplication.class, args);
     }
 
-    @Bean
+   /* @Bean
     CommandLineRunner testPolling(EmailPollingService pollingService) {
         return args -> {
             var result = pollingService.poll("ppcomp-main");
@@ -47,5 +47,5 @@ public class EmailGatewayServiceApplication {
                 System.out.println("MessageNumber: " + event.getMessageNumber());
             }
         };
-    }
+    } */
 }
