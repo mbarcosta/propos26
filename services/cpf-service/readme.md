@@ -15,6 +15,9 @@ Este documento descreve **passo a passo**, desde a criação do projeto no Eclip
 - Conta no Docker Hub
 
 ---
+## Arquitetura
+
+![Arquitetura do CPF Service](../../docs/images/cpf-service-architecture.png)
 
 # 2. Criação do projeto no Eclipse
 
