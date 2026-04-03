@@ -1,0 +1,30 @@
+{
+  "bindings": [
+    {
+      "id": "ppcomp-main",
+      "name": "PPCOMP Main Mailbox",
+      "active": true,
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "mailboxAddress": "ppcomp.propos@gmail.com",
+      "appPassword": "friyyjmpxnhksstn",
+      "sourceFolder": "INBOX",
+      "processedFolder": "Processed",
+      "rules": [
+        {
+          "name": "start_vinculacao",
+          "active": true,
+          "subject": "Vinculacao",
+          "authorizedSenders": [
+            "mcosta@ifes.edu.br",
+            "mcostaifes@gmail.com",
+            "hilario.oliveira@ifes.edu.br",
+            "kkomati@ifes.edu.br"
+          ],
+          "actionType": "start_process",
+          "processKey": "vinculacao_orientacao"
+        }
+      ]
+    }
+  ]
+}

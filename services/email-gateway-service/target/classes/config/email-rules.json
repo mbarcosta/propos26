@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "name": "start_vinculacao",
+      "active": true,
+      "subject": "Vinculacao",
+      "authorizedSenders": [
+        "mcosta@ifes.edu.br","mcostaifes@gmail.com", "hilario.oliveira@ifes.edu.br","kkomati@ifes.edu.br"
+      ],
+      "actionType": "start_process",
+      "processKey": "vinculacao_orientacao"
+    }
+  ]
+}
