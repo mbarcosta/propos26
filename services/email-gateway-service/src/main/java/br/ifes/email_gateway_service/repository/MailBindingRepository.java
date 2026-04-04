@@ -3,37 +3,52 @@ package br.ifes.email_gateway_service.repository;
 import br.ifes.email_gateway_service.model.MailBinding;
 import br.ifes.email_gateway_service.model.MailBindingConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 
 @Component
 public class MailBindingRepository {
 
+    private static final Logger log = LoggerFactory.getLogger(MailBindingRepository.class);
+
+    private final String bindingsFile;
+    private final ObjectMapper objectMapper;
+
+    public MailBindingRepository(
+            @Value("${app.bindings.file:data/bindings.json}") String bindingsFile,
+            ObjectMapper objectMapper) {
+        this.bindingsFile = bindingsFile;
+        this.objectMapper = objectMapper;
+    }
+
     public List<MailBinding> findAll() {
         try {
-            ObjectMapper mapper = new ObjectMapper();
+            Path path = Paths.get(bindingsFile).toAbsolutePath();
 
-            InputStream is = getClass()
-                .getClassLoader()
-                .getResourceAsStream("config/bindings.json");
+            log.info("Loading bindings from: {}", path);
 
-            if (is == null) {
-                throw new RuntimeException("Arquivo config/bindings.json não encontrado");
+            if (!Files.exists(path)) {
+                throw new RuntimeException("Arquivo de bindings não encontrado: " + path);
             }
 
-            MailBindingConfig config = mapper.readValue(is, MailBindingConfig.class);
+            MailBindingConfig config = objectMapper.readValue(path.toFile(), MailBindingConfig.class);
 
-            if (config.getBindings() == null) {
+            if (config == null || config.getBindings() == null) {
                 return Collections.emptyList();
             }
 
             return config.getBindings();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Erro ao carregar bindings", e);
             throw new RuntimeException("Erro ao carregar bindings", e);
         }
     }

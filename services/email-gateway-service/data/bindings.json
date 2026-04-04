@@ -1,0 +1,69 @@
+{
+  "bindings": [
+    {
+      "id": "ppcomp-main",
+      "name": "PPCOMP Main Binding",
+      "active": true,
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "mailboxAddress": "ppcomp.propos@gmail.com",
+      "appPassword": "friyyjmpxnhksstn",
+      "sourceFolder": "INBOX",
+      "processedFolder": "Processed",
+      "senderGroups": [
+        {
+          "name": "colegiado",
+          "type": "EXACT_LIST",
+          "senders": [
+            "mcosta@ifes.edu.br",
+            "hilario.oliveira@ifes.edu.br",
+            "kkomati@ifes.edu.br"
+          ]
+        },
+        {
+          "name": "ifes_users",
+          "type": "DOMAIN",
+          "domains": [
+            "ifes.edu.br"
+          ]
+        },
+        {
+          "name": "any_sender",
+          "type": "ANY"
+        }
+      ],
+      "rules": [
+        {
+          "name": "start_vinculacao",
+          "active": true,
+          "subject": "Vinculacao",
+          "actionType": "start_process",
+          "processKey": "vinculacao_orientacao",
+          "allowedSenderGroups": [
+            "colegiado"
+          ]
+        },
+        {
+          "name": "start_defesa",
+          "active": true,
+          "subject": "Defesa",
+          "actionType": "start_process",
+          "processKey": "defesa_processo",
+          "allowedSenderGroups": [
+            "colegiado"
+          ]
+        },
+        {
+          "name": "generic_ifes_request",
+          "active": true,
+          "subject": "Solicitacao",
+          "actionType": "start_process",
+          "processKey": "solicitacao_generica",
+          "allowedSenderGroups": [
+            "ifes_users"
+          ]
+        }
+      ]
+    }
+  ]
+}

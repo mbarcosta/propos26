@@ -81,7 +81,7 @@ public class EmailPollingService {
             itemResult.setSubject(email.getSubject());
 
             try {
-                EmailRule rule = ruleMatcher.match(email, binding.getRules());
+            	EmailRule rule = ruleMatcher.match(email, binding);
 
                 if (rule == null) {
                     processIgnoredEmail(pollResult, itemResult);

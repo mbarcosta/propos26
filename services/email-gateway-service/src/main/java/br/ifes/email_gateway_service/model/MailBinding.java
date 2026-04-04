@@ -3,79 +3,20 @@ package br.ifes.email_gateway_service.model;
 import java.util.List;
 
 /**
- * Representa uma configuração de acesso a uma caixa postal (binding),
- * incluindo parâmetros de conexão IMAP e regras de processamento associadas.
- *
- * Um MailBinding define:
- * - como acessar uma caixa de e-mail (host, porta, credenciais)
- * - quais mensagens devem ser lidas (pasta origem)
- * - o destino das mensagens processadas (pasta de processados)
- * - quais regras devem ser aplicadas para classificar e processar os e-mails
- *
- * Esse conceito permite que o serviço seja reutilizável para múltiplas
- * caixas postais, cada uma com seu próprio conjunto de regras.
+ * Representa a configuração de integração de um cliente com o gateway.
  */
 public class MailBinding {
 
-    /**
-     * Identificador único do binding.
-     * Usado para invocação via API (ex: /bindings/{id}/poll).
-     */
     private String id;
-
-    /**
-     * Nome descritivo do binding.
-     * Usado apenas para fins de identificação humana.
-     */
     private String name;
-
-    /**
-     * Indica se o binding está ativo.
-     * Bindings inativos não devem ser processados.
-     */
     private boolean active;
-
-    /**
-     * Host do servidor IMAP (ex: imap.gmail.com).
-     */
     private String imapHost;
-
-    /**
-     * Porta do servidor IMAP (ex: 993 para IMAPS).
-     */
     private int imapPort;
-
-    /**
-     * Endereço de e-mail da caixa postal.
-     */
     private String mailboxAddress;
-
-    /**
-     * Credencial de acesso à caixa postal.
-     * Idealmente deve ser uma app password (no caso de Gmail).
-     *
-     * ⚠️ Observação:
-     * Em versões futuras, este campo deve ser substituído por um
-     * credentialRef para armazenamento seguro.
-     */
     private String appPassword;
-
-    /**
-     * Pasta de origem dos e-mails a serem lidos.
-     * Normalmente "INBOX".
-     */
     private String sourceFolder;
-
-    /**
-     * Pasta de destino para e-mails processados com sucesso.
-     * Exemplo: "Processed".
-     */
     private String processedFolder;
-
-    /**
-     * Lista de regras associadas a este binding.
-     * Cada regra define critérios de reconhecimento e ação.
-     */
+    private List<SenderGroup> senderGroups;
     private List<EmailRule> rules;
 
     public MailBinding() {
@@ -151,6 +92,14 @@ public class MailBinding {
 
     public void setProcessedFolder(String processedFolder) {
         this.processedFolder = processedFolder;
+    }
+
+    public List<SenderGroup> getSenderGroups() {
+        return senderGroups;
+    }
+
+    public void setSenderGroups(List<SenderGroup> senderGroups) {
+        this.senderGroups = senderGroups;
     }
 
     public List<EmailRule> getRules() {
