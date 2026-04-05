@@ -1,23 +1,14 @@
 package br.ifes.email_gateway_service.model;
 
-import java.util.List;
-
-/**
- * Representa a configuração de integração de um cliente com o gateway.
- */
 public class MailBinding {
 
     private String id;
-    private String name;
     private boolean active;
-    private String imapHost;
-    private int imapPort;
-    private String mailboxAddress;
-    private String appPassword;
-    private String sourceFolder;
-    private String processedFolder;
-    private List<SenderGroup> senderGroups;
-    private List<EmailRule> rules;
+
+    private MailServerConfig mailServer;
+    private MailFolderConfig folders;
+    private PollingPolicy pollingPolicy;
+    private IngestionPolicy ingestionPolicy;
 
     public MailBinding() {
     }
@@ -30,14 +21,6 @@ public class MailBinding {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public boolean isActive() {
         return active;
     }
@@ -46,67 +29,35 @@ public class MailBinding {
         this.active = active;
     }
 
-    public String getImapHost() {
-        return imapHost;
+    public MailServerConfig getMailServer() {
+        return mailServer;
     }
 
-    public void setImapHost(String imapHost) {
-        this.imapHost = imapHost;
+    public void setMailServer(MailServerConfig mailServer) {
+        this.mailServer = mailServer;
     }
 
-    public int getImapPort() {
-        return imapPort;
+    public MailFolderConfig getFolders() {
+        return folders;
     }
 
-    public void setImapPort(int imapPort) {
-        this.imapPort = imapPort;
+    public void setFolders(MailFolderConfig folders) {
+        this.folders = folders;
     }
 
-    public String getMailboxAddress() {
-        return mailboxAddress;
+    public PollingPolicy getPollingPolicy() {
+        return pollingPolicy;
     }
 
-    public void setMailboxAddress(String mailboxAddress) {
-        this.mailboxAddress = mailboxAddress;
+    public void setPollingPolicy(PollingPolicy pollingPolicy) {
+        this.pollingPolicy = pollingPolicy;
     }
 
-    public String getAppPassword() {
-        return appPassword;
+    public IngestionPolicy getIngestionPolicy() {
+        return ingestionPolicy;
     }
 
-    public void setAppPassword(String appPassword) {
-        this.appPassword = appPassword;
-    }
-
-    public String getSourceFolder() {
-        return sourceFolder;
-    }
-
-    public void setSourceFolder(String sourceFolder) {
-        this.sourceFolder = sourceFolder;
-    }
-
-    public String getProcessedFolder() {
-        return processedFolder;
-    }
-
-    public void setProcessedFolder(String processedFolder) {
-        this.processedFolder = processedFolder;
-    }
-
-    public List<SenderGroup> getSenderGroups() {
-        return senderGroups;
-    }
-
-    public void setSenderGroups(List<SenderGroup> senderGroups) {
-        this.senderGroups = senderGroups;
-    }
-
-    public List<EmailRule> getRules() {
-        return rules;
-    }
-
-    public void setRules(List<EmailRule> rules) {
-        this.rules = rules;
+    public void setIngestionPolicy(IngestionPolicy ingestionPolicy) {
+        this.ingestionPolicy = ingestionPolicy;
     }
 }

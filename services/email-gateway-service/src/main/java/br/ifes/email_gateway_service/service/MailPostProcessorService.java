@@ -33,32 +33,51 @@ public class MailPostProcessorService {
         Folder sourceFolder = null;
 
         try {
+            String protocol = binding.getMailServer().getProtocol() != null
+                    ? binding.getMailServer().getProtocol()
+                    : "imaps";
+
             Properties props = new Properties();
-            props.put("mail.store.protocol", "imaps");
-            props.put("mail.imaps.host", binding.getImapHost());
-            props.put("mail.imaps.port", String.valueOf(binding.getImapPort()));
-            props.put("mail.imaps.ssl.enable", "true");
+            props.put("mail.store.protocol", protocol);
+            props.put("mail." + protocol + ".host", binding.getMailServer().getHost());
+            props.put("mail." + protocol + ".port", String.valueOf(binding.getMailServer().getPort()));
+            props.put("mail." + protocol + ".ssl.enable", "true");
 
             Session session = Session.getInstance(props);
             session.setDebug(true);
 
-            store = session.getStore("imaps");
+            store = session.getStore(protocol);
             store.connect(
-                    binding.getImapHost(),
-                    binding.getMailboxAddress(),
-                    binding.getAppPassword()
+                    binding.getMailServer().getHost(),
+                    binding.getMailServer().getPort(),
+                    binding.getMailServer().getUsername(),
+                    binding.getMailServer().getPassword()
             );
 
-            sourceFolder = store.getFolder(binding.getSourceFolder());
+            String sourceFolderName = binding.getFolders() != null
+                    && binding.getFolders().getInbox() != null
+                    && !binding.getFolders().getInbox().isBlank()
+                    ? binding.getFolders().getInbox()
+                    : "INBOX";
+
+            sourceFolder = store.getFolder(sourceFolderName);
             sourceFolder.open(Folder.READ_WRITE);
 
-            Folder targetFolder = store.getFolder(binding.getProcessedFolder());
+            String processedFolderName = binding.getFolders() != null
+                    ? binding.getFolders().getProcessed()
+                    : null;
+
+            if (processedFolderName == null || processedFolderName.isBlank()) {
+                throw new RuntimeException("Pasta Processed não configurada no binding: " + binding.getId());
+            }
+
+            Folder targetFolder = store.getFolder(processedFolderName);
 
             if (!targetFolder.exists()) {
                 boolean created = targetFolder.create(Folder.HOLDS_MESSAGES);
                 if (!created) {
                     throw new RuntimeException(
-                            "Não foi possível criar a pasta de processados: " + binding.getProcessedFolder()
+                            "Não foi possível criar a pasta de processados: " + processedFolderName
                     );
                 }
             }
@@ -72,7 +91,6 @@ public class MailPostProcessorService {
             }
 
             sourceFolder.copyMessages(new Message[]{message}, targetFolder);
-
             message.setFlag(Flags.Flag.DELETED, true);
 
             sourceFolder.close(true);
@@ -83,7 +101,10 @@ public class MailPostProcessorService {
 
         } catch (Exception e) {
             throw new RuntimeException(
-                    "Erro ao mover e-mail para a pasta Processed: " + e.getClass().getSimpleName() + " - " + e.getMessage(),
+                    "Erro ao mover e-mail para a pasta Processed: "
+                            + e.getClass().getSimpleName()
+                            + " - "
+                            + e.getMessage(),
                     e
             );
         } finally {

@@ -1,28 +1,49 @@
 package br.ifes.email_gateway_service.model;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Representa um e-mail simplificado para processamento no sistema.
+ * Representa um e-mail padronizado para consumo externo (CIR).
  */
 public class EmailMessage {
 
+    private String messageId;
+    private int messageNumber;
+
     private String from;
+    private List<String> to = new ArrayList<>();
+    private List<String> cc = new ArrayList<>();
+
     private String subject;
     private String body;
-    private int messageNumber;
+
+    private LocalDateTime receivedAt;
+
+    private String inReplyTo;
+    private List<String> references = new ArrayList<>();
+
+    private boolean hasAttachments;
 
     public EmailMessage() {
     }
 
-    public EmailMessage(String from, String subject, int messageNumber) {
-        this.from = from;
-        this.subject = subject;
-        this.messageNumber = messageNumber;
+    // getters e setters
+
+    public String getMessageId() {
+        return messageId;
     }
 
-    public EmailMessage(String from, String subject, String body, int messageNumber) {
-        this.from = from;
-        this.subject = subject;
-        this.body = body;
+    public void setMessageId(String messageId) {
+        this.messageId = messageId;
+    }
+
+    public int getMessageNumber() {
+        return messageNumber;
+    }
+
+    public void setMessageNumber(int messageNumber) {
         this.messageNumber = messageNumber;
     }
 
@@ -32,6 +53,22 @@ public class EmailMessage {
 
     public void setFrom(String from) {
         this.from = from;
+    }
+
+    public List<String> getTo() {
+        return to;
+    }
+
+    public void setTo(List<String> to) {
+        this.to = to;
+    }
+
+    public List<String> getCc() {
+        return cc;
+    }
+
+    public void setCc(List<String> cc) {
+        this.cc = cc;
     }
 
     public String getSubject() {
@@ -50,11 +87,35 @@ public class EmailMessage {
         this.body = body;
     }
 
-    public int getMessageNumber() {
-        return messageNumber;
+    public LocalDateTime getReceivedAt() {
+        return receivedAt;
     }
 
-    public void setMessageNumber(int messageNumber) {
-        this.messageNumber = messageNumber;
+    public void setReceivedAt(LocalDateTime receivedAt) {
+        this.receivedAt = receivedAt;
+    }
+
+    public String getInReplyTo() {
+        return inReplyTo;
+    }
+
+    public void setInReplyTo(String inReplyTo) {
+        this.inReplyTo = inReplyTo;
+    }
+
+    public List<String> getReferences() {
+        return references;
+    }
+
+    public void setReferences(List<String> references) {
+        this.references = references;
+    }
+
+    public boolean isHasAttachments() {
+        return hasAttachments;
+    }
+
+    public void setHasAttachments(boolean hasAttachments) {
+        this.hasAttachments = hasAttachments;
     }
 }

@@ -1,32 +1,26 @@
 package br.ifes.email_gateway_service.model;
 
 /**
- * Representa o resultado do processamento de um único e-mail
+ * Representa o resultado da leitura de um único e-mail
  * durante uma operação de polling.
  */
 public class PollItemResult {
 
     /**
-     * Remetente do e-mail processado.
+     * Remetente do e-mail lido.
      */
     private String from;
 
     /**
-     * Assunto do e-mail processado.
+     * Assunto do e-mail lido.
      */
     private String subject;
 
     /**
-     * Nome da regra aplicada, se houver.
-     */
-    private String ruleName;
-
-    /**
-     * Status do processamento do e-mail.
+     * Status da leitura do e-mail.
      *
      * Exemplos:
-     * - PROCESSED
-     * - IGNORED
+     * - READ
      * - ERROR
      */
     private String status;
@@ -53,14 +47,6 @@ public class PollItemResult {
 
     public void setSubject(String subject) {
         this.subject = subject;
-    }
-
-    public String getRuleName() {
-        return ruleName;
-    }
-
-    public void setRuleName(String ruleName) {
-        this.ruleName = ruleName;
     }
 
     public String getStatus() {
