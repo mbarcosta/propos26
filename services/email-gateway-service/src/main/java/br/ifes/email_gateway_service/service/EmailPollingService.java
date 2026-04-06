@@ -61,14 +61,14 @@ public class EmailPollingService {
 
         return pollResult;
     }
-
     /**
-     * Marca uma mensagem como processada, movendo-a para a pasta Processed.
+     * Marca como processada a mensagem identificada por {@code messageId},
+     * movendo-a para a pasta "Processed".
      *
      * @param bindingId identificador do binding
-     * @param messageNumber número da mensagem na pasta
+     * @param messageId identificador técnico da mensagem
      */
-    public void markAsProcessed(String bindingId, int messageNumber) {
+    public void markAsProcessed(String bindingId, String messageId) {
         MailBinding binding = bindingRepository.findById(bindingId);
 
         if (binding == null) {
@@ -79,9 +79,14 @@ public class EmailPollingService {
             throw new RuntimeException("Binding inativo: " + bindingId);
         }
 
+        if (messageId == null || messageId.isBlank()) {
+            throw new RuntimeException("messageId inválido para binding: " + bindingId);
+        }
+
         EmailMessage email = new EmailMessage();
-        email.setMessageNumber(messageNumber);
+        email.setMessageId(messageId);
 
         mailPostProcessorService.moveToProcessed(binding, email);
     }
+   
 }

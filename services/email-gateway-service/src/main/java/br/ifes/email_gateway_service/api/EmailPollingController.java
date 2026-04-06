@@ -1,5 +1,6 @@
 package br.ifes.email_gateway_service.api;
 
+import br.ifes.email_gateway_service.api.dto.MarkAsProcessedRequest;
 import br.ifes.email_gateway_service.model.OperationResult;
 import br.ifes.email_gateway_service.model.PollResult;
 import br.ifes.email_gateway_service.service.EmailPollingService;
@@ -99,16 +100,16 @@ public class EmailPollingController {
      * @param messageNumber número da mensagem na pasta (identificador interno IMAP)
      * @return {@link OperationResult} com status da operação
      */
-    @PostMapping("/{bindingId}/messages/{messageNumber}/processed")
+    @PostMapping("/{bindingId}/messages/processed")
     public OperationResult markAsProcessed(@PathVariable String bindingId,
-                                           @PathVariable int messageNumber) {
+                                           @RequestBody MarkAsProcessedRequest request) {
 
-        pollingService.markAsProcessed(bindingId, messageNumber);
+        pollingService.markAsProcessed(bindingId, request.getMessageId());
 
         return new OperationResult(
                 bindingId,
                 "SUCCESS",
-                "Mensagem movida para a pasta Processed com sucesso. messageNumber=" + messageNumber
+                "Mensagem movida para a pasta Processed com sucesso. messageId=" + request.getMessageId()
         );
     }
 }
