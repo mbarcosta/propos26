@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1gpo8uk" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.45.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+  <bpmn:process id="Matricula_v1" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="StartEvent_1" name="MATRICULA_START">
+      <bpmn:outgoing>Flow_16w414k</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_1mxd8je" messageRef="Message_06p162q" />
+    </bpmn:startEvent>
+    <bpmn:task id="Activity_1bp0k5g" name="MATRICULAR">
+      <bpmn:incoming>Flow_16w414k</bpmn:incoming>
+      <bpmn:outgoing>Flow_145jvvz</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_16w414k" sourceRef="StartEvent_1" targetRef="Activity_1bp0k5g" />
+    <bpmn:sequenceFlow id="Flow_145jvvz" sourceRef="Activity_1bp0k5g" targetRef="Event_1yc5rkm" />
+    <bpmn:intermediateCatchEvent id="Event_1yc5rkm" name="EMAIL_REPLY">
+      <bpmn:incoming>Flow_145jvvz</bpmn:incoming>
+      <bpmn:outgoing>Flow_1siyrcm</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_0gjjvrc" messageRef="Message_12ni430" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="Event_0zkdjem">
+      <bpmn:incoming>Flow_1siyrcm</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1siyrcm" sourceRef="Event_1yc5rkm" targetRef="Event_0zkdjem" />
+  </bpmn:process>
+  <bpmn:message id="Message_06p162q" name="MATRICULA_START" />
+  <bpmn:message id="Message_12ni430" name="EMAIL_REPLY" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Matricula_v1">
+      <bpmndi:BPMNShape id="Event_1ftp6nv_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="182" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="158" y="165" width="84" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1bp0k5g_di" bpmnElement="Activity_1bp0k5g">
+        <dc:Bounds x="270" y="100" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0gbr01u_di" bpmnElement="Event_1yc5rkm">
+        <dc:Bounds x="422" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="402" y="165" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0zkdjem_di" bpmnElement="Event_0zkdjem">
+        <dc:Bounds x="512" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_16w414k_di" bpmnElement="Flow_16w414k">
+        <di:waypoint x="218" y="140" />
+        <di:waypoint x="270" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_145jvvz_di" bpmnElement="Flow_145jvvz">
+        <di:waypoint x="370" y="140" />
+        <di:waypoint x="422" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1siyrcm_di" bpmnElement="Flow_1siyrcm">
+        <di:waypoint x="458" y="140" />
+        <di:waypoint x="512" y="140" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

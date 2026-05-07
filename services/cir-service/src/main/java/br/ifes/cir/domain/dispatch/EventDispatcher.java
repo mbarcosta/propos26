@@ -3,58 +3,28 @@ package br.ifes.cir.domain.dispatch;
 import org.springframework.stereotype.Component;
 
 import br.ifes.cir.domain.handler.HandlerResult;
-import br.ifes.cir.domain.handler.VinculacaoEventHandler;
+import br.ifes.cir.domain.handler.VinculacaoHandler;
 import br.ifes.cir.domain.model.CirIdentifiedEvent;
 
 /**
- * Componente responsável por encaminhar eventos identificados
+ * Responsável por rotear eventos identificados
  * para seus respectivos handlers.
- *
- * <p>Este componente remove do serviço principal (CirService)
- * a responsabilidade de decidir qual handler executar.</p>
- *
- * <p>Isso melhora:</p>
- * <ul>
- *   <li>modularidade</li>
- *   <li>extensibilidade</li>
- *   <li>legibilidade do fluxo principal</li>
- * </ul>
  */
 @Component
 public class EventDispatcher {
 
-    private final VinculacaoEventHandler vinculacaoEventHandler;
+    private final VinculacaoHandler vinculacaoHandler;
 
-    /**
-     * Construtor com injeção de dependência.
-     *
-     * @param vinculacaoEventHandler handler de vinculação
-     */
-    public EventDispatcher(VinculacaoEventHandler vinculacaoEventHandler) {
-        this.vinculacaoEventHandler = vinculacaoEventHandler;
+    public EventDispatcher(VinculacaoHandler vinculacaoHandler) {
+        this.vinculacaoHandler = vinculacaoHandler;
     }
 
-    /**
-     * Encaminha o evento para o handler apropriado.
-     *
-     * @param event evento identificado
-     * @return resultado do processamento
-     */
     public HandlerResult dispatch(CirIdentifiedEvent event) {
 
-        /*
-         * Seleção simples baseada no tipo do evento.
-         * Pode evoluir para estratégia/mapa no futuro.
-         */
         if ("VINCULACAO_RECEBIDA".equals(event.getEventType())) {
-            return vinculacaoEventHandler.handle(event);
+            return vinculacaoHandler.handle(event);
         }
 
-        /*
-         * Caso não exista handler para o evento.
-         */
-        return HandlerResult.failure(
-                "Nenhum handler configurado para eventType=" + event.getEventType()
-        );
+        return HandlerResult.failure("Tipo de evento não suportado: " + event.getEventType());
     }
 }

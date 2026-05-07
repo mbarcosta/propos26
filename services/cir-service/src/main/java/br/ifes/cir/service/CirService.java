@@ -1,238 +1,299 @@
 package br.ifes.cir.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import br.ifes.cir.client.CamundaClient;
 import br.ifes.cir.client.GmsClient;
 import br.ifes.cir.client.dto.GmsPollResult;
-import br.ifes.cir.domain.handler.HandlerResult;
-import br.ifes.cir.domain.handler.VinculacaoHandler;
+import br.ifes.cir.client.dto.VariableValue;
 import br.ifes.cir.domain.model.CirExecutionResult;
-import br.ifes.cir.domain.model.CirIdentifiedEvent;
+import br.ifes.cir.domain.rule.ClassifiedMessage;
+import br.ifes.cir.domain.rule.MessageClassificationKind;
 import br.ifes.cir.domain.rule.MessageEventClassifier;
 import br.ifes.cir.domain.store.ProcessedMessageStore;
 
 /**
  * Serviço principal do CIR.
  *
- * <p>Esta classe coordena o fluxo central de processamento do componente,
- * atuando como orquestradora entre:</p>
+ * <p>Nesta versão, o CIR atua como uma camada de entrada e encaminhamento
+ * de mensagens para o Camunda. Ele não conhece o fluxo interno dos processos
+ * BPMN, nem executa lógica específica de Vinculação, Defesa ou qualquer
+ * outro processo.</p>
+ *
+ * <p>Seu papel passa a ser estritamente este:</p>
  *
  * <ul>
- *   <li>o GMS, que fornece as mensagens lidas da caixa postal;</li>
- *   <li>o classificador, que interpreta mensagens como eventos de negócio;</li>
- *   <li>os handlers, que executam ações específicas para cada tipo de evento;</li>
- *   <li>o próprio GMS novamente, para confirmar que uma mensagem já foi
- *       efetivamente consumida e pode ser movida para a pasta "Processed".</li>
+ *   <li>consultar o GMS para obter novas mensagens da caixa postal;</li>
+ *   <li>classificar as mensagens em categorias mínimas compreendidas
+ *       pelo CIR: START, REPLY ou IRRELEVANT;</li>
+ *   <li>encaminhar ao Camunda apenas as mensagens relevantes;</li>
+ *   <li>solicitar ao GMS a movimentação para {@code Processed}
+ *       apenas após encaminhamento bem-sucedido;</li>
+ *   <li>registrar localmente que a mensagem já foi processada.</li>
  * </ul>
  *
- * <p>Fluxo executado nesta versão:</p>
- * <ol>
- *   <li>o CIR solicita ao GMS o polling de um binding;</li>
- *   <li>as mensagens retornadas são classificadas em eventos de negócio;</li>
- *   <li>cada evento identificado é tratado por seu handler correspondente;</li>
- *   <li>somente se o handler indicar sucesso, o CIR chama o GMS para mover
- *       a mensagem para a pasta "Processed";</li>
- *   <li>após a confirmação no GMS, a mensagem é marcada localmente como
- *       processada no controle em memória do CIR.</li>
- * </ol>
- *
- * <p>Essa ordem é importante porque evita confirmar como concluído um evento
- * que ainda não foi realmente processado com sucesso.</p>
+ * <p>O princípio arquitetural importante é:
+ * o CIR classifica e encaminha;
+ * o Camunda interpreta, correlaciona e orquestra.</p>
  */
 @Service
 public class CirService {
 
     /**
-     * Cliente responsável pela comunicação do CIR com o GMS.
+     * Cliente de comunicação com o GMS.
      *
-     * <p>É usado tanto para executar o polling quanto para confirmar
-     * o processamento bem-sucedido de uma mensagem.</p>
+     * <p>É usado para:</p>
+     * <ul>
+     *   <li>executar o polling da caixa postal de um binding;</li>
+     *   <li>mover mensagens para a pasta {@code Processed}
+     *       após sucesso no encaminhamento ao Camunda.</li>
+     * </ul>
      */
     private final GmsClient gmsClient;
 
     /**
-     * Componente responsável por classificar mensagens em eventos de negócio.
+     * Classificador responsável por transformar mensagens lidas do GMS
+     * em objetos {@link ClassifiedMessage}.
+     *
+     * <p>Esse classificador já embute a lógica mínima do CIR:
+     * distinguir mensagens de início, respostas correlacionáveis
+     * e mensagens irrelevantes.</p>
      */
     private final MessageEventClassifier classifier;
 
     /**
-     * Handler responsável pelo tratamento do evento de vinculação.
+     * Cliente de integração REST com o Camunda.
+     *
+     * <p>É por meio dele que o CIR envia mensagens ao engine BPMN,
+     * seja para iniciar novas instâncias, seja para correlacionar
+     * respostas intermediárias.</p>
      */
-    private final VinculacaoHandler vinculacaoHandler;
+    private final CamundaClient camundaClient;
 
     /**
      * Controle local provisório de mensagens já processadas.
      *
-     * <p>Nesta fase do projeto, este controle ainda é mantido em memória,
-     * servindo como proteção adicional contra reprocessamento local.</p>
+     * <p>Nesta fase, esse mecanismo complementa a movimentação
+     * para {@code Processed}, ajudando a evitar reprocessamento local.</p>
      */
     private final ProcessedMessageStore store;
 
     /**
-     * Construtor com injeção de dependência.
+     * Construtor com injeção de dependências.
      *
      * @param gmsClient cliente de integração com o GMS
-     * @param classifier classificador de mensagens em eventos
-     * @param vinculacaoHandler handler do caso de uso de vinculação
+     * @param classifier classificador de mensagens
+     * @param camundaClient cliente de integração com o Camunda
      * @param store controle local de mensagens processadas
      */
     public CirService(
             GmsClient gmsClient,
             MessageEventClassifier classifier,
-            VinculacaoHandler vinculacaoHandler,
+            CamundaClient camundaClient,
             ProcessedMessageStore store) {
+
         this.gmsClient = gmsClient;
         this.classifier = classifier;
-        this.vinculacaoHandler = vinculacaoHandler;
+        this.camundaClient = camundaClient;
         this.store = store;
     }
-
+    
     /**
-     * Executa o fluxo principal do CIR para o binding informado.
+     * Gera o correlationId para marcar as conversas de uma mesma instancia de process.
+     * 
+     */
+    private String generateCorrelationId(String messageName) {
+        long now = System.currentTimeMillis();
+
+        if ("VINCULACAO_START".equals(messageName)) {
+            return "VINC-" + now;
+        }
+
+        if ("DEFESA_START".equals(messageName)) {
+            return "DEF-" + now;
+        }
+
+        return "MSG-" + now;
+    }
+    /**
+     * Executa o ciclo principal do CIR para o binding informado.
      *
-     * <p>Este método representa a operação principal do componente.
-     * Ele consulta o GMS, identifica eventos de negócio e tenta tratá-los
-     * um a um.</p>
+     * <p>Fluxo desta versão:</p>
      *
-     * <p>Regras de consistência aplicadas:</p>
-     * <ul>
-     *   <li>se o evento for identificado, mas o handler falhar, a mensagem
-     *       não é movida para "Processed";</li>
-     *   <li>se o handler tiver sucesso, a mensagem é então confirmada no GMS;</li>
-     *   <li>somente após essa confirmação a mensagem é marcada localmente
-     *       como processada.</li>
-     * </ul>
+     * <ol>
+     *   <li>executa polling no GMS;</li>
+     *   <li>classifica as mensagens em START, REPLY ou IRRELEVANT;</li>
+     *   <li>encaminha ao Camunda apenas START e REPLY;</li>
+     *   <li>se o encaminhamento for bem-sucedido, move a mensagem
+     *       para {@code Processed} via GMS;</li>
+     *   <li>marca a mensagem localmente como processada.</li>
+     * </ol>
+     *
+     * <p>Nesta fase, o CIR já preserva metadados importantes da mensagem,
+     * como assunto, corpo, remetente e identificador, para que o Camunda
+     * possa utilizá-los na correlação e no processamento do fluxo.</p>
      *
      * @param bindingId identificador do binding a ser processado
-     * @return resultado consolidado da execução do CIR
+     * @return resultado consolidado da execução
      */
     public CirExecutionResult execute(String bindingId) {
 
         /*
-         * Etapa 1:
-         * Solicita ao GMS a execução do polling da caixa associada ao binding.
-         *
-         * O resultado inclui resumo operacional e a lista de mensagens lidas.
+         * ETAPA 1
+         * Solicita ao GMS o polling da caixa postal associada ao binding.
          */
         GmsPollResult gmsResult = gmsClient.poll(bindingId);
 
         /*
-         * Etapa 2:
-         * Classifica as mensagens retornadas pelo GMS em eventos de negócio
-         * reconhecidos pelo CIR.
+         * ETAPA 2
+         * Classifica as mensagens retornadas pelo GMS.
          *
-         * Exemplo atual:
-         * - assunto contendo "vinculacao" -> VINCULACAO_RECEBIDA
+         * O resultado agora não é mais um evento específico de processo,
+         * mas sim uma representação genérica e desacoplada:
+         * START, REPLY ou IRRELEVANT.
          */
-        List<CirIdentifiedEvent> identifiedEvents =
+        List<ClassifiedMessage> classifiedMessages =
                 classifier.classify(gmsResult.getMessages());
 
         /*
-         * Etapa 3:
-         * Para cada evento identificado, executa o handler correspondente.
-         *
-         * Nesta versão, temos apenas o tratamento explícito do caso
-         * VINCULACAO_RECEBIDA.
+         * ETAPA 3
+         * Para cada mensagem classificada como relevante,
+         * tenta encaminhá-la ao Camunda.
          */
-        for (CirIdentifiedEvent event : identifiedEvents) {
+        for (ClassifiedMessage message : classifiedMessages) {
             try {
-                HandlerResult handlerResult = null;
 
                 /*
-                 * Seleciona e executa o tratamento apropriado para o tipo
-                 * do evento identificado.
-                 */
-                if ("VINCULACAO_RECEBIDA".equals(event.getEventType())) {
-                    handlerResult = vinculacaoHandler.handle(event);
-                }
-
-                /*
-                 * Se não houver handler configurado para o tipo do evento,
-                 * tratamos isso como falha explícita.
+                 * Monta o mapa base de variáveis no formato esperado pelo Camunda.
                  *
-                 * Isso evita considerar como "sucesso" um evento que,
-                 * na prática, não foi tratado.
+                 * Além das variáveis extraídas pelo classificador,
+                 * o CIR preserva o binding de origem.
                  */
-                if (handlerResult == null) {
-                    System.out.println(
-                            "Nenhum handler configurado para eventType=" + event.getEventType()
-                    );
-                    continue;
+                Map<String, VariableValue> variables = camundaClient.newVariables();
+
+                for (Map.Entry<String, Object> entry : message.getVariables().entrySet()) {
+                    variables.put(entry.getKey(), toCamundaVariable(entry.getValue()));
                 }
 
+                variables.put("bindingId", camundaClient.stringVar(bindingId));
+
                 /*
-                 * Etapa 4:
-                 * Só confirma a mensagem como processada se o handler
-                 * tiver indicado sucesso explícito.
+                 * Encaminhamento por tipo lógico da mensagem.
                  */
-                if (handlerResult.isSuccess()) {
+                if (message.getKind() == MessageClassificationKind.START) {
+                	String correlationId = message.getCorrelationId();
+
+                	    if (correlationId == null || correlationId.isBlank()) {
+                	        correlationId = generateCorrelationId(message.getMessageName());
+                	        variables.put("correlationId", camundaClient.stringVar(correlationId));
+                	    }
+
+                	    
+                    /*
+                     * Mensagem de início:
+                     * o CIR envia ao Camunda o messageName específico do processo.
+                     *
+                     * Exemplo:
+                     * - VINCULACAO_START
+                     * - DEFESA_START
+                     */
+                    camundaClient.sendStartMessage(
+                            message.getMessageName(),
+                            message.getCorrelationId(),
+                            variables
+                    );
+
+                } else if (message.getKind() == MessageClassificationKind.REPLY) {
 
                     /*
-                     * Confirma no GMS que a mensagem foi efetivamente
-                     * consumida com sucesso e pode ser movida para
-                     * a pasta "Processed".
+                     * Mensagem intermediária correlacionável:
+                     * o CIR envia ao Camunda um messageName genérico,
+                     * acompanhado da chave de correlação extraída da própria mensagem.
+                     *
+                     * O Camunda é quem decide em qual instância e em qual ponto
+                     * do processo essa resposta deve ser entregue.
                      */
-                    gmsClient.moveToProcessed(bindingId, event.getMessageId());
-
-                    /*
-                     * Após a confirmação no GMS, registra localmente
-                     * que a mensagem já foi processada pelo CIR.
-                     */
-                    store.markAsProcessed(event.getMessageId());
+                    camundaClient.sendReplyMessage(
+                            message.getMessageName(),
+                            message.getCorrelationId(),
+                            variables
+                    );
 
                 } else {
 
                     /*
-                     * Se o handler indicou falha, a mensagem não deve ser
-                     * movida para "Processed" nem marcada localmente como
-                     * concluída.
-                     *
-                     * Assim, ela poderá ser reprocessada futuramente.
+                     * Mensagens irrelevantes não devem chegar aqui,
+                     * pois o classificador já as filtra.
+                     * Ainda assim, mantemos a proteção por clareza.
                      */
-                    System.out.println(
-                            "Falha no processamento do evento. messageId="
-                                    + event.getMessageId()
-                                    + ", motivo="
-                                    + handlerResult.getMessage()
-                    );
+                    continue;
                 }
+
+                /*
+                 * ETAPA 4
+                 * Se o encaminhamento ao Camunda ocorreu sem exceção,
+                 * a mensagem pode ser confirmada como processada.
+                 */
+                gmsClient.moveToProcessed(bindingId, message.getMessageId());
+                store.markAsProcessed(message.getMessageId());
 
             } catch (Exception e) {
 
                 /*
-                 * Em caso de falha inesperada:
+                 * Em caso de falha:
                  * - a mensagem não é movida para Processed;
                  * - a mensagem não é marcada localmente como processada.
                  *
                  * Isso preserva a possibilidade de nova tentativa futura.
                  */
-                System.out.println("Erro ao processar mensagem: " + event.getMessageId());
+                System.out.println(
+                        "Erro ao encaminhar mensagem ao Camunda. messageId="
+                                + message.getMessageId()
+                                + ", kind="
+                                + message.getKind()
+                                + ", messageName="
+                                + message.getMessageName()
+                );
                 e.printStackTrace();
             }
         }
 
         /*
-         * Etapa 5:
+         * ETAPA 5
          * Monta o resultado consolidado da execução.
          *
-         * Observação importante:
-         * nesta versão, a lista identifiedEvents representa os eventos
-         * identificados na execução, independentemente de terem sido
-         * concluídos com sucesso ou não.
-         *
-         * Mais adiante, esse retorno pode ser refinado para separar:
-         * - eventos identificados
-         * - eventos processados com sucesso
-         * - eventos com falha
+         * Observação:
+         * esta implementação assume que o modelo de retorno do CIR
+         * já foi ou será ajustado para refletir o novo tipo de saída.
          */
         CirExecutionResult result = new CirExecutionResult();
         result.setBindingId(gmsResult.getBindingId());
         result.setTotalRead(gmsResult.getTotalRead());
-        result.setIdentifiedEvents(identifiedEvents);
-        result.setTotalEventsIdentified(identifiedEvents.size());
+        result.setIdentifiedEvents(classifiedMessages);
+        System.out.println("classifiedMessages.size() = " + classifiedMessages.size());
+        result.setTotalEventsIdentified(classifiedMessages.size());
+        
 
         return result;
+    }
+
+    /**
+     * Converte um valor genérico para o formato de variável esperado pelo Camunda.
+     *
+     * <p>Nesta fase, o suporte foi simplificado para os tipos
+     * mais comuns usados pelo CIR.</p>
+     *
+     * @param value valor original
+     * @return variável no formato aceito pelo Camunda
+     */
+    private VariableValue toCamundaVariable(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return camundaClient.booleanVar(booleanValue);
+        }
+
+        return camundaClient.stringVar(value == null ? null : String.valueOf(value));
     }
 }
