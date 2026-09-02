@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PPG Management</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        color: #17202a;
+      }
+
+      header {
+        padding: 16px 24px;
+        background: #ffffff;
+        border-bottom: 1px solid #d8dee6;
+      }
+
+      main {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      }
+
+      section {
+        background: #ffffff;
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        padding: 14px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+
+      form {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      label {
+        color: #52616f;
+        font-size: 13px;
+      }
+
+      input,
+      select,
+      button {
+        box-sizing: border-box;
+        font: inherit;
+      }
+
+      input,
+      select {
+        width: 100%;
+        border: 1px solid #bdc7d1;
+        border-radius: 4px;
+        padding: 8px;
+      }
+
+      button {
+        border: 1px solid #9aa6b2;
+        background: #ffffff;
+        border-radius: 4px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        background: #1f6feb;
+        border-color: #1f6feb;
+        color: #ffffff;
+      }
+
+      button.danger {
+        border-color: #b42318;
+        color: #b42318;
+      }
+
+      .actions,
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
+      .message {
+        min-height: 18px;
+        margin: 0 0 10px;
+        color: #52616f;
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #e6ebf0;
+        padding: 8px 6px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: #52616f;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PPG Management</h1>
+    </header>
+    <main>
+      <section>
+        <h2>Students</h2>
+        <p id="studentsMessage" class="message"></p>
+        <form id="studentForm">
+          <input type="hidden" name="id">
+          <div class="form-grid">
+            <label>Registration
+              <input name="registration" required>
+            </label>
+            <label>Name
+              <input name="name" required>
+            </label>
+            <label>Email
+              <input name="email" type="email" required>
+            </label>
+            <label>Status
+              <select name="status">
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+                <option value="GRADUATED">GRADUATED</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="primary" type="submit">Save Student</button>
+            <button type="button" data-reset="studentForm">New Student</button>
+          </div>
+        </form>
+        <table id="students"></table>
+      </section>
+
+      <section>
+        <h2>Professors</h2>
+        <p id="professorsMessage" class="message"></p>
+        <form id="professorForm">
+          <input type="hidden" name="id">
+          <div class="form-grid">
+            <label>Name
+              <input name="name" required>
+            </label>
+            <label>Email
+              <input name="email" type="email" required>
+            </label>
+            <label>Status
+              <select name="status">
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+                <option value="RETIRED">RETIRED</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="primary" type="submit">Save Professor</button>
+            <button type="button" data-reset="professorForm">New Professor</button>
+          </div>
+        </form>
+        <table id="professors"></table>
+      </section>
+
+      <section>
+        <h2>Programs</h2>
+        <table id="programs"></table>
+      </section>
+
+      <section>
+        <h2>Advisorships</h2>
+        <table id="advisorships"></table>
+      </section>
+    </main>
+    <script>
+      let students = [];
+      let professors = [];
+
+      async function json(path, options) {
+        const response = await fetch(path, options);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        if (response.status === 204) {
+          return null;
+        }
+        return response.json();
+      }
+
+      function table(id, columns, rows, actions) {
+        const element = document.getElementById(id);
+        const actionHeader = actions ? '<th>Actions</th>' : '';
+        element.innerHTML = '<thead><tr>' + columns.map((item) => `<th>${escapeHtml(item)}</th>`).join('') + actionHeader + '</tr></thead>' +
+          '<tbody>' + rows.map((row) => {
+            const cells = columns.map((column) => `<td>${escapeHtml(row[column] ?? '')}</td>`).join('');
+            const actionCells = actions ? `<td><div class="actions">${actions(row)}</div></td>` : '';
+            return `<tr>${cells}${actionCells}</tr>`;
+          }).join('') + '</tbody>';
+      }
+
+      function fillForm(formId, data) {
+        const form = document.getElementById(formId);
+        Object.entries(data).forEach(([key, value]) => {
+          const field = form.elements[key];
+          if (field) {
+            field.value = value ?? '';
+          }
+        });
+      }
+
+      function resetForm(formId) {
+        const form = document.getElementById(formId);
+        form.reset();
+        form.elements.id.value = '';
+      }
+
+      function formData(form) {
+        return Object.fromEntries(new FormData(form).entries());
+      }
+
+      function renderStudents() {
+        table('students', ['id', 'registration', 'name', 'email', 'status'], students, (student) => `
+          <button type="button" data-edit-student="${student.id}">Edit</button>
+          <button class="danger" type="button" data-delete-student="${student.id}">Delete</button>
+        `);
+      }
+
+      function renderProfessors() {
+        table('professors', ['id', 'name', 'email', 'status'], professors, (professor) => `
+          <button type="button" data-edit-professor="${professor.id}">Edit</button>
+          <button class="danger" type="button" data-delete-professor="${professor.id}">Delete</button>
+        `);
+      }
+
+      async function load() {
+        const [loadedStudents, loadedProfessors, programs, advisorships] = await Promise.all([
+          json('/api/students'),
+          json('/api/professors'),
+          json('/api/programs'),
+          json('/api/advisorships')
+        ]);
+
+        students = loadedStudents;
+        professors = loadedProfessors;
+        renderStudents();
+        renderProfessors();
+        table('programs', ['id', 'name', 'institution', 'campus', 'coordinatorName', 'coordinatorEmail'], programs);
+        table('advisorships', ['id', 'studentId', 'advisorId', 'title', 'researchArea', 'startDate', 'status'], advisorships);
+      }
+
+      async function saveStudent(event) {
+        event.preventDefault();
+        const payload = formData(event.currentTarget);
+        const id = payload.id;
+        delete payload.id;
+        const path = id ? `/api/students/${id}` : '/api/students';
+        const method = id ? 'PUT' : 'POST';
+        await json(path, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        resetForm('studentForm');
+        document.getElementById('studentsMessage').textContent = 'Student saved.';
+        await load();
+      }
+
+      async function saveProfessor(event) {
+        event.preventDefault();
+        const payload = formData(event.currentTarget);
+        const id = payload.id;
+        delete payload.id;
+        const path = id ? `/api/professors/${id}` : '/api/professors';
+        const method = id ? 'PUT' : 'POST';
+        await json(path, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        resetForm('professorForm');
+        document.getElementById('professorsMessage').textContent = 'Professor saved.';
+        await load();
+      }
+
+      async function handleClick(event) {
+        const studentEditId = event.target.dataset.editStudent;
+        const studentDeleteId = event.target.dataset.deleteStudent;
+        const professorEditId = event.target.dataset.editProfessor;
+        const professorDeleteId = event.target.dataset.deleteProfessor;
+        const resetTarget = event.target.dataset.reset;
+
+        if (resetTarget) {
+          resetForm(resetTarget);
+        } else if (studentEditId) {
+          fillForm('studentForm', students.find((item) => String(item.id) === studentEditId));
+        } else if (professorEditId) {
+          fillForm('professorForm', professors.find((item) => String(item.id) === professorEditId));
+        } else if (studentDeleteId && confirm('Delete this student?')) {
+          await json(`/api/students/${studentDeleteId}`, { method: 'DELETE' });
+          document.getElementById('studentsMessage').textContent = 'Student deleted.';
+          await load();
+        } else if (professorDeleteId && confirm('Delete this professor?')) {
+          await json(`/api/professors/${professorDeleteId}`, { method: 'DELETE' });
+          document.getElementById('professorsMessage').textContent = 'Professor deleted.';
+          await load();
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      document.getElementById('studentForm').addEventListener('submit', saveStudent);
+      document.getElementById('professorForm').addEventListener('submit', saveProfessor);
+      document.addEventListener('click', handleClick);
+      load();
+    </script>
+  </body>
+</html>

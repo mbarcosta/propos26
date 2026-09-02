@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 import br.ifes.cir.client.dto.GmsMessage;
+import br.ifes.cir.domain.config.CirRouteDefinition;
+import br.ifes.cir.domain.config.CirRouteRepository;
 import br.ifes.cir.domain.store.ProcessedMessageStore;
 
 /**
@@ -38,6 +40,7 @@ public class MessageEventClassifier {
      * <p>É usado apenas como proteção contra reprocessamento local.</p>
      */
     private final ProcessedMessageStore store;
+    private final CirRouteRepository routeRepository;
 
     /**
      * Padrão explícito para extração da chave de correlação.
@@ -49,7 +52,11 @@ public class MessageEventClassifier {
      * </pre>
      */
     private static final Pattern CORRELATION_ID_PATTERN =
-            Pattern.compile("CORRELATION-ID\\s*:\\s*([A-Za-z0-9\\-_./]+)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?:CORRELATION[-_\\s]*ID|correlationId|ID)\\s*[:=]?\\s*([A-Za-z0-9][A-Za-z0-9\\-_./]*-[A-Za-z0-9][A-Za-z0-9\\-_./]*)",
+                    Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern CORRELATION_TOKEN_PATTERN =
+            Pattern.compile("(?i)(?:^|[^A-Za-z0-9])((?:MSG|VINC|DEF)-[A-Za-z0-9][A-Za-z0-9\\-_./]*)(?:$|[^A-Za-z0-9])");
 
     /**
      * Padrão alternativo para extração de chave entre colchetes no assunto.
@@ -61,10 +68,11 @@ public class MessageEventClassifier {
      * </pre>
      */
     private static final Pattern BRACKET_ID_PATTERN =
-            Pattern.compile("\\[([A-Za-z]+-[0-9]+)\\]");
+            Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9\\-_./]*-[A-Za-z0-9][A-Za-z0-9\\-_./]*)\\]");
 
-    public MessageEventClassifier(ProcessedMessageStore store) {
+    public MessageEventClassifier(ProcessedMessageStore store, CirRouteRepository routeRepository) {
         this.store = store;
+        this.routeRepository = routeRepository;
     }
 
     /**
@@ -151,7 +159,9 @@ public class MessageEventClassifier {
          */
         String correlationId = extractCorrelationId(subject, body);
         if (correlationId != null) {
-            return buildReplyMessage(message, correlationId);
+            return routeRepository.findReplyRoute(subject, body)
+                    .map(route -> buildReplyMessage(message, correlationId, route))
+                    .orElseGet(() -> buildReplyMessage(message, correlationId));
         }
 
         /*
@@ -173,11 +183,9 @@ public class MessageEventClassifier {
          * Nesta etapa, as regras ainda são simples e explícitas por assunto.
          * Depois isso deve migrar para configuração externa.
          */
-        if (normalizedSubject.contains("vinculacao")) {
-            ClassifiedMessage classified = baseMessage(message);
-            classified.setKind(MessageClassificationKind.START);
-            classified.setMessageName("VINCULACAO_START");
-            return classified;
+        var configuredStart = routeRepository.findStartRouteBySubject(subject);
+        if (configuredStart.isPresent()) {
+            return buildStartMessage(message, configuredStart.get());
         }
 
         if (normalizedSubject.contains("defesa")) {
@@ -213,6 +221,74 @@ public class MessageEventClassifier {
         classified.setCorrelationId(correlationId);
         classified.addVariable("correlationId", correlationId);
         return classified;
+    }
+
+    private ClassifiedMessage buildReplyMessage(
+            GmsMessage message,
+            String correlationId,
+            CirRouteDefinition route) {
+        ClassifiedMessage classified = buildReplyMessage(message, correlationId);
+        if (route.getMessageName() != null && !route.getMessageName().isBlank()) {
+            classified.setMessageName(route.getMessageName());
+        }
+        classified.addVariable("externalEvent", route.getExternalEvent());
+        classified.addVariable("correlationVariable", route.getCorrelationVariable());
+        return classified;
+    }
+
+    private ClassifiedMessage buildStartMessage(GmsMessage message, CirRouteDefinition route) {
+        ClassifiedMessage classified = baseMessage(message);
+        classified.setKind(MessageClassificationKind.START);
+        classified.setMessageName(route.getMessageName());
+        classified.addVariable("demandRecognized", true);
+        classified.addVariable("demandType", route.getExternalEvent());
+        classified.addVariable("externalEvent", route.getExternalEvent());
+        classified.addVariable("processDefinitionKey", route.getProcessDefinitionKey());
+        classified.addVariable("correlationVariable", route.getCorrelationVariable());
+        classified.addVariable("requesterEmail", message.getFrom());
+        addAdvisorshipRequestVariables(classified, message);
+        return classified;
+    }
+
+    private void addAdvisorshipRequestVariables(ClassifiedMessage classified, GmsMessage message) {
+        String text = defaultString(message.getSubject()) + "\n" + defaultString(message.getBody());
+        addLongVariable(classified, "studentId", extractField(text, "studentId", "estudanteId", "alunoId"));
+        addLongVariable(classified, "advisorId", extractField(text, "advisorId", "orientadorId", "professorId"));
+        addStringVariable(classified, "studentName", extractField(text, "studentName", "estudante", "aluno"));
+        addStringVariable(classified, "advisorName", extractField(text, "advisorName", "orientador", "professor"));
+        addStringVariable(classified, "studentEmail", extractField(text, "studentEmail", "emailEstudante", "emailAluno"));
+        addStringVariable(classified, "advisorEmail", extractField(text, "advisorEmail", "emailOrientador", "emailProfessor"));
+        addStringVariable(classified, "title", extractField(text, "title", "titulo"));
+        addStringVariable(classified, "researchArea", extractField(text, "researchArea", "areaPesquisa", "area"));
+    }
+
+    private void addLongVariable(ClassifiedMessage classified, String variableName, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        try {
+            classified.addVariable(variableName, Long.parseLong(value.trim()));
+        } catch (NumberFormatException e) {
+            classified.addVariable(variableName, value.trim());
+        }
+    }
+
+    private void addStringVariable(ClassifiedMessage classified, String variableName, String value) {
+        if (value != null && !value.isBlank()) {
+            classified.addVariable(variableName, value.trim());
+        }
+    }
+
+    private String extractField(String text, String... labels) {
+        for (String label : labels) {
+            Pattern pattern = Pattern.compile(
+                    "(?im)^\\s*" + Pattern.quote(label) + "\\s*[:=]\\s*(.+?)\\s*$");
+            Matcher matcher = pattern.matcher(text);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+        return null;
     }
 
     /**
@@ -326,7 +402,12 @@ public class MessageEventClassifier {
 
         Matcher matcher = CORRELATION_ID_PATTERN.matcher(text);
         if (matcher.find()) {
-            return matcher.group(1);
+            return cleanCorrelationId(matcher.group(1));
+        }
+
+        matcher = CORRELATION_TOKEN_PATTERN.matcher(text);
+        if (matcher.find()) {
+            return cleanCorrelationId(matcher.group(1));
         }
 
         return null;
@@ -350,10 +431,17 @@ public class MessageEventClassifier {
 
         Matcher matcher = BRACKET_ID_PATTERN.matcher(text);
         if (matcher.find()) {
-            return matcher.group(1);
+            return cleanCorrelationId(matcher.group(1));
         }
 
         return null;
+    }
+
+    private String cleanCorrelationId(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[.,;:]+$", "");
     }
 
     /**

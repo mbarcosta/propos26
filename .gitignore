@@ -4,6 +4,11 @@ target/
 # Logs
 *.log
 
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
 # Eclipse
 .project
 .classpath

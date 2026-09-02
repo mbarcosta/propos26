@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://propos26.local/schemas/automation-project.schema.json",
+  "title": "AutomationProject",
+  "type": "object",
+  "required": ["id", "name", "processModels"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "processModels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "bpmnFile"],
+        "properties": {
+          "id": { "type": "string" },
+          "bpmnFile": { "type": "string" },
+          "engine": { "type": "string", "enum": ["camunda7"] }
+        }
+      }
+    },
+    "automationRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "bpmnElementId", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "bpmnElementId": { "type": "string" },
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "capabilityId": { "type": "string" }
+        }
+      }
+    },
+    "capabilityBindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bpmnElementId", "capabilityId"],
+        "properties": {
+          "bpmnElementId": { "type": "string" },
+          "capabilityId": { "type": "string" },
+          "bindingType": { "type": "string" },
+          "configuration": { "type": "object" }
+        }
+      }
+    },
+    "correlations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["externalEvent", "messageName", "correlationVariable"],
+        "properties": {
+          "externalEvent": { "type": "string" },
+          "messageName": { "type": "string" },
+          "correlationVariable": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+

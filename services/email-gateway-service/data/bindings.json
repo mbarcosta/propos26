@@ -7,8 +7,8 @@
         "protocol": "imaps",
         "host": "imap.gmail.com",
         "port": 993,
-        "username": "ppcomp.propos@gmail.com",
-        "password": "friyyjmpxnhksstn"
+        "username": "${GMS_MAIL_USERNAME}",
+        "password": "${GMS_MAIL_PASSWORD}"
       },
       "folders": {
         "inbox": "INBOX",
@@ -18,7 +18,7 @@
       "pollingPolicy": {
         "onlyUnread": true,
         "maxMessagesPerPoll": 20,
-        "markAsSeenWhenRead": false
+        "markAsSeenWhenRead": true
       },
       "ingestionPolicy": {
         "includeBody": true,

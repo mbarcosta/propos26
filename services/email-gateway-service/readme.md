@@ -16,6 +16,22 @@ Entrada (Email) → Regras → Evento → Cliente
 ## Binding
 Define caixa, credenciais e regras.
 
+As credenciais do binding devem ser informadas por variaveis de ambiente:
+
+```text
+GMS_MAIL_USERNAME=usuario@example.com
+GMS_MAIL_PASSWORD=senha-ou-app-password
+```
+
+O arquivo `data/bindings.json` referencia essas variaveis usando placeholders Spring:
+
+```json
+{
+  "username": "${GMS_MAIL_USERNAME}",
+  "password": "${GMS_MAIL_PASSWORD}"
+}
+```
+
 ## Fluxo
 1. Busca emails UNSEEN
 2. Aplica regras

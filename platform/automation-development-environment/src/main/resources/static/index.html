@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>propos26 ADE</title>
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-font/css/bpmn.css">
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        color: #17202a;
+        background: #f4f6f8;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #ffffff;
+        border-bottom: 1px solid #d8dee6;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      nav {
+        display: flex;
+        gap: 6px;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button {
+        border: 1px solid #9aa6b2;
+        background: #ffffff;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #1f6feb;
+        color: #ffffff;
+        border-color: #1f6feb;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: calc(100vh - 54px);
+      }
+      aside {
+        padding: 14px;
+        border-right: 1px solid #d8dee6;
+        background: #ffffff;
+        overflow: auto;
+      }
+      section {
+        display: none;
+        padding: 14px;
+      }
+      section.active {
+        display: block;
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        color: #52616f;
+        font-size: 13px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #bdc7d1;
+        border-radius: 4px;
+        padding: 8px;
+      }
+      textarea {
+        min-height: 120px;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+      }
+      #canvas {
+        height: calc(100vh - 162px);
+        min-height: 420px;
+        background: #ffffff;
+        border: 1px solid #d8dee6;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin: 10px 0;
+        flex-wrap: wrap;
+      }
+      .item {
+        border: 1px solid #d8dee6;
+        background: #ffffff;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+      .branch-row {
+        border-top: 1px solid #e6ebf0;
+        padding-top: 10px;
+        margin-top: 10px;
+      }
+      .help-link {
+        margin: 6px 0 10px;
+      }
+      .help-link a {
+        color: #1f6feb;
+        font-size: 13px;
+      }
+      input[type="checkbox"] {
+        width: auto;
+        margin-right: 6px;
+      }
+      .status {
+        display: inline-block;
+        padding: 3px 6px;
+        border-radius: 4px;
+        background: #e8eef5;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #e6ebf0;
+        padding: 8px;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>propos26 ADE</h1>
+      <nav>
+        <button data-tab="projects">Projects</button>
+        <button data-tab="bpmn">BPMN</button>
+        <button data-tab="automation">Automation</button>
+        <button data-tab="integrations">Integrations</button>
+        <button data-tab="deployment">Deployment</button>
+        <button data-tab="execution">Execution</button>
+      </nav>
+    </header>
+    <main>
+      <aside>
+        <label>Name</label>
+        <input id="projectName" value="Vinculacao de Orientacao">
+        <label>Key</label>
+        <input id="projectKey" value="vinculacao-orientacao">
+        <label>Version</label>
+        <input id="projectVersion" value="1.0">
+        <div class="row">
+          <button id="saveProject">Save Project</button>
+          <button id="loadReference">Load Reference</button>
+        </div>
+        <p>Status: <span class="status" id="projectStatus">DRAFT</span></p>
+        <p id="runtime"></p>
+      </aside>
+      <div>
+        <section id="projects" class="active">
+          <h2>Projects</h2>
+          <p>Create or open an Automation Project. Project data is stored in this browser for the MVP.</p>
+          <div id="projectSummary" class="item"></div>
+        </section>
+        <section id="bpmn">
+          <h2>BPMN</h2>
+          <div class="row">
+            <button id="loadXml">Load XML</button>
+            <button id="saveXml">Save XML</button>
+            <button id="exportXml">Export XML</button>
+          </div>
+          <div id="canvas"></div>
+          <label>BPMN XML</label>
+          <textarea id="xml"></textarea>
+        </section>
+        <section id="automation">
+          <h2>Automation</h2>
+          <div class="row">
+            <button id="analyze">Analyze BPMN</button>
+          </div>
+          <h3>Derived Project Configuration</h3>
+          <div id="derivedConfig"></div>
+          <h3>BPMN Element Requirements</h3>
+          <div id="requirements"></div>
+        </section>
+        <section id="integrations">
+          <h2>Integrations</h2>
+          <div class="item">
+            <label>Process History TTL</label>
+            <input id="historyTimeToLive" value="180">
+            <label>Channel</label>
+            <input id="integrationChannel" value="EMAIL">
+            <label>External Event</label>
+            <input id="externalEvent" value="VINCULACAO_SOLICITADA">
+            <label>Start Email Subject Contains</label>
+            <input id="subjectContains" value="vinculacao">
+            <label>Camunda Message</label>
+            <input id="camundaMessage" value="VINCULACAO_SOLICITADA">
+            <label>Correlation Field</label>
+            <input id="correlationField" value="requestId">
+            <button id="saveIntegration">Save Integration</button>
+          </div>
+          <div id="integrationSummary"></div>
+        </section>
+        <section id="deployment">
+          <h2>Deployment</h2>
+          <div class="row">
+            <button id="validate">Validate</button>
+            <button id="deploy" class="primary">Deploy Automation</button>
+          </div>
+          <div id="deploymentProgress" class="item"></div>
+          <pre id="deploymentResult"></pre>
+        </section>
+        <section id="execution">
+          <h2>Execution</h2>
+          <div class="item">
+            <label>GMS Binding</label>
+            <input id="executionBindingId" value="ppcomp-main">
+            <button id="runCir">Run GMS -> CIR</button>
+          </div>
+          <pre id="executionInfo"></pre>
+        </section>
+      </div>
+    </main>
+    <script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-modeler.development.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

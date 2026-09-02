@@ -2,6 +2,7 @@ package br.ifes.cir.client;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.beans.factory.annotation.Value;
 
 import br.ifes.cir.client.dto.GmsPollResult;
 import br.ifes.cir.client.dto.MarkAsProcessedRequest;
@@ -13,9 +14,12 @@ import br.ifes.cir.client.dto.MarkAsProcessedRequest;
 public class GmsClient {
 
     private final RestTemplate restTemplate;
+    private final String baseUrl;
 
-    public GmsClient(RestTemplate restTemplate) {
+    public GmsClient(RestTemplate restTemplate,
+                     @Value("${gms.base-url:http://localhost:8081}") String baseUrl) {
         this.restTemplate = restTemplate;
+        this.baseUrl = baseUrl;
     }
 
     /**
@@ -25,7 +29,7 @@ public class GmsClient {
      * @return resultado retornado pelo GMS
      */
     public GmsPollResult poll(String bindingId) {
-        String url = "http://localhost:8081/api/bindings/" + bindingId + "/poll";
+        String url = baseUrl + "/api/bindings/" + bindingId + "/poll";
         return restTemplate.postForObject(url, null, GmsPollResult.class);
     }
 
@@ -39,7 +43,7 @@ public class GmsClient {
      * @param messageId identificador técnico da mensagem
      */
     public void moveToProcessed(String bindingId, String messageId) {
-        String url = "http://localhost:8081/api/bindings/" + bindingId + "/messages/processed";
+        String url = baseUrl + "/api/bindings/" + bindingId + "/messages/processed";
         MarkAsProcessedRequest request = new MarkAsProcessedRequest(messageId);
         restTemplate.postForObject(url, request, Void.class);
     }

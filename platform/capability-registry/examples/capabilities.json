@@ -1,0 +1,29 @@
+[
+  {
+    "id": "VALIDATE_CPF",
+    "name": "Validate CPF",
+    "type": "BUSINESS_SERVICE",
+    "provider": "cpf-service",
+    "interface": "REST",
+    "status": "AVAILABLE",
+    "endpoint": "GET /cpf/{cpf}"
+  },
+  {
+    "id": "SEND_EMAIL",
+    "name": "Send Email",
+    "type": "INTEGRATION",
+    "provider": "email-gateway-service",
+    "interface": "REST",
+    "status": "PLANNED"
+  },
+  {
+    "id": "CALCULATE_DELIVERY_QUOTE_MOTO",
+    "name": "Calculate motorcycle delivery quote",
+    "type": "BUSINESS_SERVICE",
+    "provider": "delivery-workers",
+    "interface": "EXTERNAL_TASK",
+    "status": "AVAILABLE",
+    "externalTaskTopic": "cotacao-moto"
+  }
+]
+

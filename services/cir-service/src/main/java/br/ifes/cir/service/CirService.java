@@ -202,7 +202,7 @@ public class CirService {
                      */
                     camundaClient.sendStartMessage(
                             message.getMessageName(),
-                            message.getCorrelationId(),
+                            correlationId,
                             variables
                     );
 

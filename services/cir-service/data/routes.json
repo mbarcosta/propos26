@@ -1,0 +1,20 @@
+{
+  "routes": [
+    {
+      "externalEvent": "VINCULACAO_SOLICITADA",
+      "action": "START_PROCESS",
+      "messageName": "VINCULACAO_SOLICITADA",
+      "processDefinitionKey": "vinculacao_orientacao",
+      "businessKeyVariable": "requestId",
+      "correlationVariable": "requestId",
+      "subjectContains": "vinculacao"
+    },
+    {
+      "externalEvent": "EMAIL_REPLY",
+      "action": "CORRELATE_MESSAGE",
+      "messageName": "EMAIL_REPLY",
+      "correlationVariable": "correlationId"
+    }
+  ]
+}
+

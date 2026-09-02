@@ -1,0 +1,20 @@
+services:
+  ppg-management-service:
+    build: .
+    container_name: ppg-management-service
+    ports:
+      - "${PPG_MANAGEMENT_PORT:-8090}:8090"
+    environment:
+      SERVER_PORT: 8090
+      PPG_DATA_FILE: /data/ppg-management.json
+    volumes:
+      - ppg-management-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ppg-management-data:
+

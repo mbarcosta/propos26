@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expressoes de condicao BPMN</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        color: #17202a;
+        background: #f4f6f8;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 28px 18px 40px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 14px;
+      }
+      h2 {
+        font-size: 18px;
+        margin-top: 24px;
+      }
+      code,
+      pre {
+        font-family: Consolas, monospace;
+      }
+      pre {
+        overflow-x: auto;
+        background: #ffffff;
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        padding: 12px;
+      }
+      li {
+        margin: 8px 0;
+      }
+      a {
+        color: #1f6feb;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Expressoes de condicao BPMN para e-mails</h1>
+      <p>
+        As condicoes de branch sao avaliadas pelo Camunda quando o processo passa por um gateway exclusivo.
+        Em respostas de e-mail, o CIR entrega ao processo a variavel <code>body</code> com o corpo da mensagem.
+      </p>
+
+      <h2>Padrao gerado pelo ADE</h2>
+      <p>
+        Quando uma branch tem texto BPMN, mas ainda nao tem uma condicao, o ADE gera uma expressao que procura
+        esse mesmo texto no corpo do e-mail sem diferenciar maiusculas e minusculas.
+      </p>
+      <pre><code>${body != null && body.toLowerCase().contains("confirmado")}</code></pre>
+      <p>
+        Exemplo: se o texto da branch for <code>confirmado</code>, a resposta sera aceita quando o corpo do e-mail
+        contiver <code>confirmado</code>, <code>Confirmado</code> ou <code>CONFIRMADO</code>.
+      </p>
+
+      <h2>Exemplos uteis</h2>
+      <pre><code>${body != null && body.toLowerCase().contains("aprovado")}
+${body != null && body.toLowerCase().contains("recusado")}
+${body != null && body.toLowerCase().contains("dados complementares")}</code></pre>
+
+      <h2>Boas praticas</h2>
+      <ul>
+        <li>Use textos curtos e objetivos na branch, como <code>confirmado</code>, <code>aprovado</code> ou <code>recusado</code>.</li>
+        <li>Configure uma branch default para tratar respostas que nao correspondam a nenhuma condicao.</li>
+        <li>Mantenha o identificador <code>CORRELATION-ID</code> no assunto ou corpo do e-mail para permitir a correlacao da resposta.</li>
+      </ul>
+
+      <p><a href="index.html">Voltar ao ADE</a></p>
+    </main>
+  </body>
+</html>

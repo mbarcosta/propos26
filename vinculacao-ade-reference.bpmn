@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Vinculacao" targetNamespace="http://propos26.local/bpmn">
+  <bpmn:message id="Message_VinculacaoSolicitada" name="VINCULACAO_SOLICITADA" />
+  <bpmn:message id="Message_DadosComplementares" name="DADOS_COMPLEMENTARES" />
+  <bpmn:message id="Message_ConfirmacaoEstudante" name="CONFIRMACAO_ESTUDANTE" />
+  <bpmn:message id="Message_ConfirmacaoCoordenador" name="CONFIRMACAO_COORDENADOR" />
+  <bpmn:process id="vinculacao_orientacao" name="Vinculacao de Orientacao" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="Start_Vinculacao" name="Receber solicitacao">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_Message" messageRef="Message_VinculacaoSolicitada" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_VerificarDados" name="Verificar dados" camunda:type="external" camunda:topic="VALIDATE_ADVISORSHIP_REQUEST">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_DadosCompletos" name="Dados completos?">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_DadosNao</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DadosSim</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_SolicitarDados" name="Solicitar dados" camunda:type="external" camunda:topic="SEND_EMAIL">
+      <bpmn:incoming>Flow_DadosNao</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:intermediateCatchEvent id="Catch_DadosComplementares" name="Aguardar resposta">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Catch_Dados_Message" messageRef="Message_DadosComplementares" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sendTask id="Task_SolicitarConfirmacaoEstudante" name="Solicitar confirmacao ao estudante" camunda:type="external" camunda:topic="SEND_EMAIL">
+      <bpmn:incoming>Flow_DadosSim</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:intermediateCatchEvent id="Catch_ConfirmacaoEstudante" name="Aguardar confirmacao estudante">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Catch_Estudante_Message" messageRef="Message_ConfirmacaoEstudante" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sendTask id="Task_SolicitarConfirmacaoCoordenador" name="Solicitar confirmacao ao coordenador" camunda:type="external" camunda:topic="SEND_EMAIL">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:intermediateCatchEvent id="Catch_ConfirmacaoCoordenador" name="Aguardar confirmacao coordenador">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Catch_Coordenador_Message" messageRef="Message_ConfirmacaoCoordenador" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_RegistrarOrientacao" name="Registrar orientacao" camunda:type="external" camunda:topic="REGISTER_ADVISORSHIP">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Vinculacao" name="Fim">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_Vinculacao" targetRef="Task_VerificarDados" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_VerificarDados" targetRef="Gateway_DadosCompletos" />
+    <bpmn:sequenceFlow id="Flow_DadosNao" sourceRef="Gateway_DadosCompletos" targetRef="Task_SolicitarDados">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${complete == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DadosSim" sourceRef="Gateway_DadosCompletos" targetRef="Task_SolicitarConfirmacaoEstudante">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${complete == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_SolicitarDados" targetRef="Catch_DadosComplementares" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Catch_DadosComplementares" targetRef="Task_VerificarDados" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_SolicitarConfirmacaoEstudante" targetRef="Catch_ConfirmacaoEstudante" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Catch_ConfirmacaoEstudante" targetRef="Task_SolicitarConfirmacaoCoordenador" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SolicitarConfirmacaoCoordenador" targetRef="Catch_ConfirmacaoCoordenador" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Catch_ConfirmacaoCoordenador" targetRef="Task_RegistrarOrientacao" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_RegistrarOrientacao" targetRef="End_Vinculacao" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="vinculacao_orientacao">
+      <bpmndi:BPMNShape id="Start_Vinculacao_di" bpmnElement="Start_Vinculacao">
+        <dc:Bounds x="120" y="170" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerificarDados_di" bpmnElement="Task_VerificarDados">
+        <dc:Bounds x="210" y="148" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_DadosCompletos_di" bpmnElement="Gateway_DadosCompletos" isMarkerVisible="true">
+        <dc:Bounds x="390" y="163" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SolicitarDados_di" bpmnElement="Task_SolicitarDados">
+        <dc:Bounds x="520" y="270" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_DadosComplementares_di" bpmnElement="Catch_DadosComplementares">
+        <dc:Bounds x="720" y="292" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SolicitarConfirmacaoEstudante_di" bpmnElement="Task_SolicitarConfirmacaoEstudante">
+        <dc:Bounds x="520" y="148" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_ConfirmacaoEstudante_di" bpmnElement="Catch_ConfirmacaoEstudante">
+        <dc:Bounds x="735" y="170" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SolicitarConfirmacaoCoordenador_di" bpmnElement="Task_SolicitarConfirmacaoCoordenador">
+        <dc:Bounds x="840" y="148" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_ConfirmacaoCoordenador_di" bpmnElement="Catch_ConfirmacaoCoordenador">
+        <dc:Bounds x="1065" y="170" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RegistrarOrientacao_di" bpmnElement="Task_RegistrarOrientacao">
+        <dc:Bounds x="1170" y="148" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Vinculacao_di" bpmnElement="End_Vinculacao">
+        <dc:Bounds x="1370" y="170" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="156" y="188" />
+        <di:waypoint x="210" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="330" y="188" />
+        <di:waypoint x="390" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DadosNao_di" bpmnElement="Flow_DadosNao">
+        <di:waypoint x="415" y="213" />
+        <di:waypoint x="415" y="310" />
+        <di:waypoint x="520" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DadosSim_di" bpmnElement="Flow_DadosSim">
+        <di:waypoint x="440" y="188" />
+        <di:waypoint x="520" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="640" y="310" />
+        <di:waypoint x="720" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="738" y="328" />
+        <di:waypoint x="738" y="390" />
+        <di:waypoint x="270" y="390" />
+        <di:waypoint x="270" y="228" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="670" y="188" />
+        <di:waypoint x="735" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="771" y="188" />
+        <di:waypoint x="840" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1000" y="188" />
+        <di:waypoint x="1065" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1101" y="188" />
+        <di:waypoint x="1170" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1310" y="188" />
+        <di:waypoint x="1370" y="188" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

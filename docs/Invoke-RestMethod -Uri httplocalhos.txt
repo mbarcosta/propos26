@@ -1,0 +1,7 @@
+ Invoke-RestMethod -Uri http://localhost:8090/api/students -Method Post -ContentType "application/json" -Body '{"regis
+  tration":"2026001","name":"Aluno 1","email":"mcostaifes@gmail.com","status":"ACTIVE"}'
+
+  Cadastrar orientador:
+
+  Invoke-RestMethod -Uri http://localhost:8090/api/professors -Method Post -ContentType "application/json" -Body '{"nam
+  e":"Professor 1","email":"mbarcosta@gmail.com","status":"ACTIVE"}'

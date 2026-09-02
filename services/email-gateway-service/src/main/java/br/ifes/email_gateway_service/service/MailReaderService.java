@@ -11,6 +11,7 @@ import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
 import jakarta.mail.internet.InternetAddress;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.mail.search.FlagTerm;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,12 @@ import java.util.Properties;
  */
 @Service
 public class MailReaderService {
+
+    private final String sslTrust;
+
+    public MailReaderService(@Value("${app.mail.ssl.trust:imap.gmail.com}") String sslTrust) {
+        this.sslTrust = sslTrust;
+    }
 
     /**
      * Lê mensagens da caixa postal configurada no binding e as converte
@@ -107,7 +114,7 @@ public class MailReaderService {
             // Abre a pasta apenas para leitura, pois este serviço não deve
             // alterar o estado da caixa postal.
             inbox = store.getFolder(inboxFolderName);
-            inbox.open(Folder.READ_ONLY);
+            inbox.open(shouldMarkAsSeenWhenRead(binding) ? Folder.READ_WRITE : Folder.READ_ONLY);
 
             // Carrega as mensagens conforme a política do binding
             // (por exemplo: somente não lidas ou todas).
@@ -127,6 +134,7 @@ public class MailReaderService {
 
                 EmailMessage email = toEmailMessage(message, binding);
                 emails.add(email);
+                markAsSeenIfConfigured(message, binding);
                 count++;
             }
 
@@ -174,12 +182,24 @@ public class MailReaderService {
         props.put(protocolPrefix + ".host", binding.getMailServer().getHost());
         props.put(protocolPrefix + ".port", String.valueOf(binding.getMailServer().getPort()));
         props.put(protocolPrefix + ".ssl.enable", "true");
+        props.put(protocolPrefix + ".ssl.trust", sslTrust);
 
-        // Garante leitura sem marcar a mensagem como lida.
-        props.put("mail.imap.peek", "true");
-        props.put("mail.imaps.peek", "true");
+        boolean peek = !shouldMarkAsSeenWhenRead(binding);
+        props.put("mail.imap.peek", String.valueOf(peek));
+        props.put("mail.imaps.peek", String.valueOf(peek));
 
         return props;
+    }
+
+    private boolean shouldMarkAsSeenWhenRead(MailBinding binding) {
+        return binding.getPollingPolicy() != null
+                && binding.getPollingPolicy().isMarkAsSeenWhenRead();
+    }
+
+    private void markAsSeenIfConfigured(Message message, MailBinding binding) throws Exception {
+        if (shouldMarkAsSeenWhenRead(binding)) {
+            message.setFlag(Flags.Flag.SEEN, true);
+        }
     }
 
     /**

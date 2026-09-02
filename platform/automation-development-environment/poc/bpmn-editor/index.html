@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>propos26 ADE BPMN Editor PoC</title>
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-font/css/bpmn.css">
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        color: #1f2933;
+      }
+
+      body {
+        display: grid;
+        grid-template-rows: 48px 1fr 210px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #d7dde5;
+        background: #f7f9fb;
+      }
+
+      button {
+        height: 32px;
+        border: 1px solid #9aa6b2;
+        background: #ffffff;
+        color: #1f2933;
+        padding: 0 10px;
+        cursor: pointer;
+      }
+
+      #canvas {
+        min-height: 320px;
+      }
+
+      textarea {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        border: 0;
+        border-top: 1px solid #d7dde5;
+        padding: 10px;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>ADE BPMN Editor PoC</strong>
+      <button id="load">Load XML</button>
+      <button id="export">Export XML</button>
+    </header>
+    <main id="canvas"></main>
+    <textarea id="xml"></textarea>
+
+    <script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-modeler.development.js"></script>
+    <script>
+      const defaultXml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_ADE_PoC" targetNamespace="http://propos26.local/bpmn">
+  <bpmn:process id="ade_poc_process" name="ADE PoC Process" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_Validate" name="Validate request" camunda:type="external" camunda:topic="VALIDATE_REQUEST">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_1" name="Done">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_Validate" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Validate" targetRef="EndEvent_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="ade_poc_process">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="160" y="120" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Validate_di" bpmnElement="Task_Validate">
+        <dc:Bounds x="250" y="98" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="440" y="120" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="196" y="138" />
+        <di:waypoint x="250" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="380" y="138" />
+        <di:waypoint x="440" y="138" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+
+      const modeler = new BpmnJS({ container: '#canvas' });
+      const xmlBox = document.getElementById('xml');
+      xmlBox.value = defaultXml;
+
+      async function loadXml() {
+        await modeler.importXML(xmlBox.value);
+        modeler.get('canvas').zoom('fit-viewport');
+      }
+
+      async function exportXml() {
+        const result = await modeler.saveXML({ format: true });
+        xmlBox.value = result.xml;
+      }
+
+      document.getElementById('load').addEventListener('click', loadXml);
+      document.getElementById('export').addEventListener('click', exportXml);
+
+      loadXml().catch((error) => {
+        xmlBox.value = error.stack || String(error);
+      });
+    </script>
+  </body>
+</html>
+

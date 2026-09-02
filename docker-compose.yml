@@ -1,0 +1,79 @@
+services:
+  camunda7:
+    image: camunda/camunda-bpm-platform:run-latest
+    container_name: propos26-camunda7
+    ports:
+      - "${CAMUNDA_PORT:-8080}:8080"
+
+  ade:
+    build: ./platform/automation-development-environment
+    container_name: propos26-ade
+    ports:
+      - "${ADE_PORT:-8070}:8070"
+    environment:
+      SERVER_PORT: 8070
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      CIR_BASE_URL: ${CIR_BASE_URL:-http://cir:8082}
+      GMS_BASE_URL: ${GMS_BASE_URL:-http://gms:8081}
+    depends_on:
+      - camunda7
+      - cir
+      - gms
+
+  gms:
+    build: ./services/email-gateway-service
+    container_name: propos26-gms
+    ports:
+      - "${GMS_PORT:-8081}:8081"
+    environment:
+      SERVER_PORT: 8081
+      GMS_MAIL_USERNAME: ${GMS_MAIL_USERNAME:-change-me}
+      GMS_MAIL_PASSWORD: ${GMS_MAIL_PASSWORD:-change-me}
+      GMS_MAIL_SSL_TRUST: ${GMS_MAIL_SSL_TRUST:-imap.gmail.com}
+      APP_BINDINGS_FILE: ${GMS_BINDINGS_FILE:-/config/bindings.json}
+    volumes:
+      - ./services/email-gateway-service/data:/config
+
+  cir:
+    build: ./services/cir-service
+    container_name: propos26-cir
+    ports:
+      - "${CIR_PORT:-8082}:8082"
+    environment:
+      SERVER_PORT: 8082
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      GMS_BASE_URL: ${GMS_BASE_URL:-http://gms:8081}
+      CIR_ROUTES_FILE: ${CIR_ROUTES_FILE:-/config/routes.json}
+    volumes:
+      - cir-routes:/config
+    depends_on:
+      - camunda7
+      - gms
+
+  cpf-service:
+    build: ./services/cpf-service
+    container_name: propos26-cpf-service
+    ports:
+      - "${CPF_PORT:-8083}:8080"
+
+  automation-workers:
+    build: ./delivery-workers
+    container_name: propos26-automation-workers
+    ports:
+      - "${WORKERS_PORT:-8091}:8091"
+    environment:
+      SERVER_PORT: 8091
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      WORKER_ID: propos26-automation-workers
+      PPG_MANAGEMENT_BASE_URL: ${PPG_MANAGEMENT_BASE_URL:-http://host.docker.internal:8090}
+      MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-smtp.gmail.com}
+      MAIL_SMTP_PORT: ${MAIL_SMTP_PORT:-587}
+      MAIL_SMTP_USERNAME: ${MAIL_SMTP_USERNAME:-${GMS_MAIL_USERNAME:-change-me}}
+      MAIL_SMTP_PASSWORD: ${MAIL_SMTP_PASSWORD:-${GMS_MAIL_PASSWORD:-change-me}}
+      MAIL_FROM: ${MAIL_FROM:-${GMS_MAIL_USERNAME:-change-me}}
+      MAIL_SEND_ENABLED: ${MAIL_SEND_ENABLED:-true}
+    depends_on:
+      - camunda7
+
+volumes:
+  cir-routes:
