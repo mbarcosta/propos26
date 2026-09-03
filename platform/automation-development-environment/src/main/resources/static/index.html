@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>propos26 ADE</title>
+    <title>propos26 Automation Development Environment</title>
     <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/diagram-js.css">
     <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-font/css/bpmn.css">
     <style>
@@ -14,9 +14,10 @@
         background: #f4f6f8;
       }
       header {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(260px, 1fr);
+        gap: 12px;
         align-items: center;
-        justify-content: space-between;
         padding: 12px 16px;
         background: #ffffff;
         border-bottom: 1px solid #d8dee6;
@@ -25,9 +26,17 @@
         margin: 0;
         font-size: 20px;
       }
-      nav {
+      .subtitle {
+        margin: 3px 0 0;
+        color: #52616f;
+        font-size: 13px;
+      }
+      nav,
+      .row {
         display: flex;
-        gap: 6px;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
       }
       button,
       input,
@@ -36,7 +45,9 @@
         font: inherit;
       }
       button {
+        min-height: 34px;
         border: 1px solid #9aa6b2;
+        border-radius: 4px;
         background: #ffffff;
         padding: 7px 10px;
         cursor: pointer;
@@ -46,16 +57,47 @@
         color: #ffffff;
         border-color: #1f6feb;
       }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+      .project-menu {
+        position: relative;
+      }
+      .project-menu-panel {
+        position: absolute;
+        top: 40px;
+        left: 0;
+        z-index: 20;
+        display: none;
+        width: 180px;
+        padding: 6px;
+        border: 1px solid #bdc7d1;
+        border-radius: 6px;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(23, 32, 42, 0.14);
+      }
+      .project-menu.open .project-menu-panel {
+        display: grid;
+        gap: 4px;
+      }
+      .project-menu-panel button {
+        width: 100%;
+        text-align: left;
+      }
       main {
         display: grid;
         grid-template-columns: 320px 1fr;
-        min-height: calc(100vh - 54px);
+        min-height: calc(100vh - 74px);
       }
       aside {
         padding: 14px;
         border-right: 1px solid #d8dee6;
         background: #ffffff;
         overflow: auto;
+      }
+      .workspace {
+        min-width: 0;
       }
       section {
         display: none;
@@ -85,16 +127,10 @@
         font-size: 12px;
       }
       #canvas {
-        height: calc(100vh - 162px);
+        height: calc(100vh - 178px);
         min-height: 420px;
         background: #ffffff;
         border: 1px solid #d8dee6;
-      }
-      .row {
-        display: flex;
-        gap: 8px;
-        margin: 10px 0;
-        flex-wrap: wrap;
       }
       .item {
         border: 1px solid #d8dee6;
@@ -125,6 +161,262 @@
         border-radius: 4px;
         background: #e8eef5;
       }
+      .active-project {
+        display: grid;
+        gap: 3px;
+        margin: 0 0 12px;
+        padding: 10px;
+        border: 1px solid #d8dee6;
+        background: #f8fafc;
+      }
+      .start-screen {
+        display: none;
+        place-items: center;
+        min-height: calc(100vh - 74px);
+        padding: 24px;
+      }
+      .start-panel {
+        width: min(560px, 100%);
+        text-align: center;
+      }
+      .start-panel h2 {
+        margin: 0 0 6px;
+        font-size: 28px;
+      }
+      .start-panel p {
+        margin: 0 0 18px;
+        color: #52616f;
+      }
+      body.no-project:not(.project-browser) main {
+        display: none;
+      }
+      body.no-project .start-screen {
+        display: grid;
+      }
+      body.project-browser .start-screen {
+        display: none;
+      }
+      body.no-project.project-browser .start-screen {
+        display: none;
+      }
+      body.project-browser main {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      body.project-browser aside {
+        display: none;
+      }
+      body.no-project nav button {
+        opacity: 0.45;
+      }
+      .project-list {
+        display: grid;
+        gap: 8px;
+      }
+      .project-row {
+        display: grid;
+        grid-template-columns: minmax(160px, 1fr) 90px 180px 130px auto;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        background: #ffffff;
+        padding: 10px;
+      }
+      .project-row.header {
+        color: #52616f;
+        font-size: 13px;
+        font-weight: bold;
+        background: #f8fafc;
+      }
+      .wizard-actions {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .wizard-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        background: rgba(23, 32, 42, 0.48);
+      }
+      .wizard-overlay.open {
+        display: grid;
+      }
+      .wizard-modal {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        width: min(1120px, 96vw);
+        height: min(760px, 92vh);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 24px 60px rgba(23, 32, 42, 0.28);
+        overflow: hidden;
+      }
+      .wizard-header,
+      .wizard-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px;
+        border-bottom: 1px solid #d8dee6;
+      }
+      .wizard-footer {
+        border-top: 1px solid #d8dee6;
+        border-bottom: 0;
+        background: #f8fafc;
+      }
+      .wizard-header h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .wizard-header p,
+      .wizard-step-meta,
+      .wizard-diagnostic {
+        margin: 4px 0 0;
+        color: #52616f;
+        font-size: 13px;
+      }
+      .wizard-main {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        min-height: 0;
+      }
+      .wizard-progress {
+        overflow: auto;
+        padding: 14px;
+        border-right: 1px solid #d8dee6;
+        background: #fbfcfd;
+      }
+      .wizard-step-nav {
+        display: grid;
+        gap: 6px;
+      }
+      .wizard-step-button {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 8px;
+        align-items: start;
+        width: 100%;
+        text-align: left;
+        border-color: #d8dee6;
+      }
+      .wizard-step-button.current {
+        border-color: #1f6feb;
+        background: #eef5ff;
+      }
+      .wizard-step-button.error {
+        border-color: #d1242f;
+      }
+      .wizard-step-button.warning {
+        border-color: #b58407;
+      }
+      .wizard-step-symbol {
+        font-weight: bold;
+      }
+      .wizard-content {
+        min-width: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+      .wizard-card {
+        border: 1px solid #d8dee6;
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 12px;
+        background: #ffffff;
+      }
+      .wizard-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .wizard-capability-list {
+        display: grid;
+        gap: 8px;
+        max-height: 280px;
+        overflow: auto;
+      }
+      .wizard-capability-option {
+        display: grid;
+        gap: 3px;
+        width: 100%;
+        text-align: left;
+        border-color: #d8dee6;
+      }
+      .wizard-capability-option.selected {
+        border-color: #1f6feb;
+        background: #eef5ff;
+      }
+      .wizard-mapping-row {
+        display: grid;
+        grid-template-columns: minmax(130px, 1fr) 24px minmax(180px, 1.4fr);
+        gap: 8px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      .wizard-message {
+        border-left: 4px solid #9aa6b2;
+        padding: 8px 10px;
+        margin: 8px 0;
+        background: #f8fafc;
+      }
+      .wizard-message.error {
+        border-left-color: #d1242f;
+      }
+      .wizard-message.warning {
+        border-left-color: #b58407;
+      }
+      .wizard-message.info {
+        border-left-color: #1f6feb;
+      }
+      .wizard-guidance {
+        font-size: 15px;
+        line-height: 1.45;
+        color: #26323f;
+      }
+      .wizard-guidance h3 {
+        margin-top: 0;
+      }
+      .technical-details {
+        margin-top: 12px;
+        border-top: 1px solid #e6ebf0;
+        padding-top: 10px;
+      }
+      .technical-details summary {
+        cursor: pointer;
+        color: #52616f;
+        font-weight: bold;
+      }
+      .wizard-context-list {
+        display: grid;
+        gap: 6px;
+        margin: 8px 0;
+      }
+      .wizard-context-item {
+        display: grid;
+        grid-template-columns: 160px 90px 1fr;
+        gap: 8px;
+        align-items: center;
+        padding: 8px;
+        border: 1px solid #e6ebf0;
+        border-radius: 6px;
+        background: #fbfcfd;
+      }
+      .wizard-choice {
+        display: grid;
+        grid-template-columns: 150px 140px minmax(180px, 1fr);
+        gap: 8px;
+        align-items: end;
+        margin: 10px 0;
+      }
+      .wizard-choice label {
+        margin-top: 0;
+      }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -135,41 +427,104 @@
         border-bottom: 1px solid #e6ebf0;
         padding: 8px;
         text-align: left;
+        vertical-align: top;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 860px) {
+        header,
+        main {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid #d8dee6;
+        }
+        .project-row {
+          grid-template-columns: 1fr;
+        }
+        .project-row.header {
+          display: none;
+        }
+        .wizard-modal {
+          height: 94vh;
+        }
+        .wizard-main,
+        .wizard-grid {
+          grid-template-columns: 1fr;
+        }
+        .wizard-progress {
+          max-height: 180px;
+          border-right: 0;
+          border-bottom: 1px solid #d8dee6;
+        }
       }
     </style>
   </head>
-  <body>
+  <body class="no-project">
     <header>
-      <h1>propos26 ADE</h1>
+      <div class="project-menu" id="projectMenu">
+        <button id="projectMenuToggle" type="button">Project</button>
+        <div class="project-menu-panel" id="projectMenuPanel">
+          <button id="menuOpenProject" type="button">Open</button>
+          <button id="menuNewProject" type="button">New</button>
+          <button id="menuSaveProject" type="button" data-requires-project>Save</button>
+          <button id="menuCloseProject" type="button" data-requires-project>Close</button>
+        </div>
+      </div>
+      <div>
+        <h1>propos26 Automation Development Environment</h1>
+        <p class="subtitle">Integrated with PPG Management</p>
+      </div>
       <nav>
-        <button data-tab="projects">Projects</button>
-        <button data-tab="bpmn">BPMN</button>
-        <button data-tab="automation">Automation</button>
-        <button data-tab="integrations">Integrations</button>
-        <button data-tab="deployment">Deployment</button>
-        <button data-tab="execution">Execution</button>
+        <button data-tab="bpmn" data-requires-project>BPMN</button>
+        <button data-tab="automation" data-requires-project>Automation</button>
+        <button data-tab="capabilities" data-requires-project>Capabilities</button>
+        <button data-tab="integrations" data-requires-project>Integrations</button>
+        <button data-tab="deployment" data-requires-project>Deployment</button>
+        <button data-tab="execution" data-requires-project>Execution</button>
       </nav>
     </header>
+
+    <div class="start-screen">
+      <div class="start-panel">
+        <h2>propos26 Automation Development Environment</h2>
+        <p>Integrated with PPG Management</p>
+      </div>
+    </div>
+
     <main>
       <aside>
-        <label>Name</label>
-        <input id="projectName" value="Vinculacao de Orientacao">
-        <label>Key</label>
-        <input id="projectKey" value="vinculacao-orientacao">
-        <label>Version</label>
-        <input id="projectVersion" value="1.0">
-        <div class="row">
-          <button id="saveProject">Save Project</button>
-          <button id="loadReference">Load Reference</button>
+        <div class="active-project">
+          <strong>Project: <span id="activeProjectName">No project open</span></strong>
+          <span>Version: <span id="activeProjectVersion">-</span></span>
+          <span>Status: <span class="status" id="projectStatus">DRAFT</span></span>
+          <span><span id="saveState">-</span></span>
         </div>
-        <p>Status: <span class="status" id="projectStatus">DRAFT</span></p>
+        <label>Name</label>
+        <input id="projectName" data-project-field>
+        <label>Key</label>
+        <input id="projectKey" data-project-field>
+        <label>Version</label>
+        <input id="projectVersion" data-project-field>
+        <label>Description</label>
+        <textarea id="projectDescription" data-project-field></textarea>
+        <div class="wizard-actions">
+          <button id="runWizard" class="primary" data-requires-project>Executar assistente de configuração</button>
+          <button id="resumeWizard" data-requires-project>Retomar assistente</button>
+          <button id="reviewWizard" data-requires-project>Revisar configuração</button>
+        </div>
+        <div class="row">
+          <button id="loadReference">Load Reference BPMN</button>
+        </div>
         <p id="runtime"></p>
       </aside>
-      <div>
+      <div class="workspace">
         <section id="projects" class="active">
-          <h2>Projects</h2>
-          <p>Create or open an Automation Project. Project data is stored in this browser for the MVP.</p>
-          <div id="projectSummary" class="item"></div>
+          <h2>Open Project</h2>
+          <div id="projectList"></div>
         </section>
         <section id="bpmn">
           <h2>BPMN</h2>
@@ -191,6 +546,12 @@
           <div id="derivedConfig"></div>
           <h3>BPMN Element Requirements</h3>
           <div id="requirements"></div>
+          <h3>Generated Code</h3>
+          <pre id="generatedCode" class="item"></pre>
+        </section>
+        <section id="capabilities">
+          <h2>Capabilities</h2>
+          <div id="capabilityList"></div>
         </section>
         <section id="integrations">
           <h2>Integrations</h2>
@@ -200,11 +561,11 @@
             <label>Channel</label>
             <input id="integrationChannel" value="EMAIL">
             <label>External Event</label>
-            <input id="externalEvent" value="VINCULACAO_SOLICITADA">
+            <input id="externalEvent">
             <label>Start Email Subject Contains</label>
-            <input id="subjectContains" value="vinculacao">
+            <input id="subjectContains">
             <label>Camunda Message</label>
-            <input id="camundaMessage" value="VINCULACAO_SOLICITADA">
+            <input id="camundaMessage">
             <label>Correlation Field</label>
             <input id="correlationField" value="requestId">
             <button id="saveIntegration">Save Integration</button>
@@ -225,12 +586,42 @@
           <div class="item">
             <label>GMS Binding</label>
             <input id="executionBindingId" value="ppcomp-main">
-            <button id="runCir">Run GMS -> CIR</button>
+            <button id="runCir">Run GMS - CIR</button>
+          </div>
+          <div class="item">
+            <div class="row">
+              <button id="refreshInstances">Refresh Instances</button>
+            </div>
+            <div id="instanceList"></div>
           </div>
           <pre id="executionInfo"></pre>
         </section>
       </div>
     </main>
+    <div class="wizard-overlay" id="wizardOverlay" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+      <div class="wizard-modal">
+        <div class="wizard-header">
+          <div>
+            <h2 id="wizardTitle">Assistente de Configuração da Automação</h2>
+            <p id="wizardProjectName">No project open</p>
+          </div>
+          <button id="wizardClose" type="button" aria-label="Close wizard">X</button>
+        </div>
+        <div class="wizard-main">
+          <aside class="wizard-progress" id="wizardProgress"></aside>
+          <div class="wizard-content" id="wizardContent"></div>
+        </div>
+        <div class="wizard-footer">
+          <span id="wizardFooterStatus">Etapa 0 de 0</span>
+          <div class="row">
+            <button id="wizardBack" type="button">Voltar</button>
+            <button id="wizardCancel" type="button">Cancelar</button>
+            <button id="wizardNext" type="button" class="primary">Avançar</button>
+            <button id="wizardFinish" type="button" class="primary">Concluir</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-modeler.development.js"></script>
     <script src="app.js"></script>
   </body>

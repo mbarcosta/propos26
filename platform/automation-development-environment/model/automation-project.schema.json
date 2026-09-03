@@ -3,62 +3,204 @@
   "$id": "https://propos26.local/schemas/automation-project.schema.json",
   "title": "AutomationProject",
   "type": "object",
-  "required": ["id", "name", "processModels"],
+  "required": ["projectId", "name", "key", "version", "metadata", "bpmnXml", "status"],
   "properties": {
-    "id": { "type": "string" },
+    "projectId": { "type": "string" },
     "name": { "type": "string" },
+    "key": { "type": "string" },
     "version": { "type": "string" },
-    "processModels": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "bpmnFile"],
-        "properties": {
-          "id": { "type": "string" },
-          "bpmnFile": { "type": "string" },
-          "engine": { "type": "string", "enum": ["camunda7"] }
-        }
-      }
+    "description": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "CONFIGURED", "VALID", "READY_FOR_DEPLOYMENT", "CONFIGURATION_REVIEW_REQUIRED", "DEPLOYING", "DEPLOYED", "FAILED"]
     },
+    "lastModified": { "type": "string", "format": "date-time" },
+    "metadata": {
+      "type": "object",
+      "required": ["projectId", "name", "key", "version"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "name": { "type": "string" },
+        "key": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "bpmnXml": { "type": "string" },
     "automationRequirements": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "bpmnElementId", "type"],
-        "properties": {
-          "id": { "type": "string" },
-          "bpmnElementId": { "type": "string" },
-          "type": { "type": "string" },
-          "status": { "type": "string" },
-          "capabilityId": { "type": "string" }
-        }
-      }
+      "items": { "$ref": "#/$defs/automationRequirement" }
+    },
+    "requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/automationRequirement" }
     },
     "capabilityBindings": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["bpmnElementId", "capabilityId"],
-        "properties": {
-          "bpmnElementId": { "type": "string" },
-          "capabilityId": { "type": "string" },
-          "bindingType": { "type": "string" },
-          "configuration": { "type": "object" }
-        }
-      }
+      "items": { "$ref": "#/$defs/capabilityBinding" }
     },
-    "correlations": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["externalEvent", "messageName", "correlationVariable"],
-        "properties": {
-          "externalEvent": { "type": "string" },
-          "messageName": { "type": "string" },
-          "correlationVariable": { "type": "string" }
+    "capabilityImplementations": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": true }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "variableMappings": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/variableMapping" }
+        },
+        {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
         }
-      }
+      ]
+    },
+    "inboundIntegrations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/inboundIntegration" }
+    },
+    "inboundConfigs": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/inboundIntegration" }
+    },
+    "outboundIntegrations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/outboundIntegration" }
+    },
+    "outboundConfigs": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/outboundIntegration" }
+    },
+    "correlationDefinitions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/correlationDefinition" }
+    },
+    "generatedComponents": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "deploymentConfiguration": {
+      "type": "object",
+      "properties": {
+        "processConfig": { "type": "object", "additionalProperties": true },
+        "integration": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "deploymentHistory": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "wizardSession": {
+      "type": ["object", "null"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "currentStep": { "type": "integer" },
+        "status": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "lastUpdatedAt": { "type": "string" },
+        "lastRunAt": { "type": "string" },
+        "lastConfiguredElement": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "stepStatuses": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "flowConditions": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": true }
+    },
+    "derivedConfig": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "automationRequirement": {
+      "type": "object",
+      "required": ["elementId", "type"],
+      "properties": {
+        "elementId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "bpmnType": { "type": "string" },
+        "capabilityId": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "capabilityBinding": {
+      "type": "object",
+      "required": ["bpmnElementId", "capabilityId"],
+      "properties": {
+        "bpmnElementId": { "type": "string" },
+        "capabilityId": { "type": "string" },
+        "bindingType": { "type": "string" },
+        "configuration": { "type": "object", "additionalProperties": true },
+        "variableMappings": { "$ref": "#/$defs/variableMapping" },
+        "implementation": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "variableMapping": {
+      "type": "object",
+      "properties": {
+        "inputs": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "inboundIntegration": {
+      "type": "object",
+      "properties": {
+        "bpmnElementId": { "type": "string" },
+        "channel": { "type": "string" },
+        "action": { "type": "string" },
+        "externalEvent": { "type": "string" },
+        "camundaMessage": { "type": "string" },
+        "correlationField": { "type": "string" },
+        "correlationExpression": { "type": "string" },
+        "variableMappings": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "outboundIntegration": {
+      "type": "object",
+      "properties": {
+        "bpmnElementId": { "type": "string" },
+        "emailTo": { "type": "string" },
+        "emailSubject": { "type": "string" },
+        "emailBody": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "correlationDefinition": {
+      "type": "object",
+      "properties": {
+        "bpmnElementId": { "type": "string" },
+        "externalEvent": { "type": "string" },
+        "camundaMessage": { "type": "string" },
+        "correlationField": { "type": "string" },
+        "correlationExpression": { "type": "string" }
+      },
+      "additionalProperties": true
     }
   }
 }
-

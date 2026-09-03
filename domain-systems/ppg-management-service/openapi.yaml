@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: PPG Management Service API
+  version: 0.3.0
+paths:
+  /api/health:
+    get:
+      summary: Service health
+      responses:
+        "200": { description: OK }
+  /api/students:
+    get:
+      summary: List students
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create student
+      responses:
+        "200": { description: OK }
+  /api/students/{id}:
+    get:
+      summary: Get student by id
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    put:
+      summary: Update student
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    delete:
+      summary: Delete student for administration or tests
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Not found }
+  /api/students/by-registration/{registration}:
+    get:
+      summary: Find student by registration
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/students/by-email:
+    get:
+      summary: Find student by email
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/students/{id}/status:
+    get:
+      summary: Return student existence and active status
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/professors:
+    get:
+      summary: List professors
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create professor
+      responses:
+        "200": { description: OK }
+  /api/professors/{id}:
+    get:
+      summary: Get professor by id
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    put:
+      summary: Update professor
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    delete:
+      summary: Delete professor for administration or tests
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Not found }
+  /api/professors/by-email:
+    get:
+      summary: Find professor by email
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/advisorships:
+    get:
+      summary: List advisorships
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create advisorship
+      responses:
+        "200": { description: OK }
+  /api/advisorships/{id}:
+    get:
+      summary: Get advisorship by id
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/advisorships/by-student/{studentId}:
+    get:
+      summary: List advisorships by student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: OK }
+  /api/advisorships/by-advisor/{advisorId}:
+    get:
+      summary: List advisorships by advisor
+      parameters:
+        - name: advisorId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: OK }
+  /api/advisorships/{id}/cancel:
+    post:
+      summary: Cancel advisorship preserving history
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/defenses:
+    get:
+      summary: List defenses
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create defense
+      responses:
+        "200": { description: OK }
+  /api/defenses/{id}:
+    get:
+      summary: Get defense by id
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    put:
+      summary: Update defense
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/defenses/by-student/{studentId}:
+    get:
+      summary: List defenses by student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: OK }
+  /api/defenses/{id}/status:
+    patch:
+      summary: Update defense status
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "400": { description: Missing status }
+        "404": { description: Not found }
+  /api/defenses/{id}/cancel:
+    post:
+      summary: Cancel defense
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/defenses/{defenseId}/dissertation:
+    post:
+      summary: Upload or replace dissertation document
+      parameters:
+        - $ref: "#/components/parameters/DefenseId"
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200": { description: OK }
+        "400": { description: Empty file }
+        "404": { description: Defense not found }
+    get:
+      summary: Return latest dissertation metadata
+      parameters:
+        - $ref: "#/components/parameters/DefenseId"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/defenses/{defenseId}/dissertation/versions:
+    get:
+      summary: List dissertation document versions
+      parameters:
+        - $ref: "#/components/parameters/DefenseId"
+      responses:
+        "200": { description: OK }
+        "404": { description: Defense not found }
+  /api/defenses/{defenseId}/dissertation/download:
+    get:
+      summary: Download latest dissertation file
+      parameters:
+        - $ref: "#/components/parameters/DefenseId"
+      responses:
+        "200": { description: File }
+        "404": { description: Not found }
+  /api/defenses/{defenseId}/dissertation/download-link:
+    post:
+      summary: Return a download URL reference
+      parameters:
+        - $ref: "#/components/parameters/DefenseId"
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    DefenseId:
+      name: defenseId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }

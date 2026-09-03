@@ -1,6 +1,8 @@
 package br.ifes.ppg.management.store;
 
 import br.ifes.ppg.management.domain.Advisorship;
+import br.ifes.ppg.management.domain.Defense;
+import br.ifes.ppg.management.domain.DissertationDocument;
 import br.ifes.ppg.management.domain.Professor;
 import br.ifes.ppg.management.domain.Program;
 import br.ifes.ppg.management.domain.Student;
@@ -14,10 +16,14 @@ public class PpgState {
     private long professorSequence = 0;
     private long programSequence = 0;
     private long advisorshipSequence = 0;
+    private long defenseSequence = 0;
+    private long documentSequence = 0;
     private List<Student> students = new ArrayList<>();
     private List<Professor> professors = new ArrayList<>();
     private List<Program> programs = new ArrayList<>();
     private List<Advisorship> advisorships = new ArrayList<>();
+    private List<Defense> defenses = new ArrayList<>();
+    private List<DissertationDocument> dissertationDocuments = new ArrayList<>();
 
     public long nextStudentId() {
         return ++studentSequence;
@@ -33,6 +39,14 @@ public class PpgState {
 
     public long nextAdvisorshipId() {
         return ++advisorshipSequence;
+    }
+
+    public long nextDefenseId() {
+        return ++defenseSequence;
+    }
+
+    public long nextDocumentId() {
+        return ++documentSequence;
     }
 
     public long getStudentSequence() {
@@ -67,6 +81,22 @@ public class PpgState {
         this.advisorshipSequence = advisorshipSequence;
     }
 
+    public long getDefenseSequence() {
+        return defenseSequence;
+    }
+
+    public void setDefenseSequence(long defenseSequence) {
+        this.defenseSequence = defenseSequence;
+    }
+
+    public long getDocumentSequence() {
+        return documentSequence;
+    }
+
+    public void setDocumentSequence(long documentSequence) {
+        this.documentSequence = documentSequence;
+    }
+
     public List<Student> getStudents() {
         return students;
     }
@@ -97,5 +127,21 @@ public class PpgState {
 
     public void setAdvisorships(List<Advisorship> advisorships) {
         this.advisorships = advisorships;
+    }
+
+    public List<Defense> getDefenses() {
+        return defenses;
+    }
+
+    public void setDefenses(List<Defense> defenses) {
+        this.defenses = defenses;
+    }
+
+    public List<DissertationDocument> getDissertationDocuments() {
+        return dissertationDocuments;
+    }
+
+    public void setDissertationDocuments(List<DissertationDocument> dissertationDocuments) {
+        this.dissertationDocuments = dissertationDocuments;
     }
 }
