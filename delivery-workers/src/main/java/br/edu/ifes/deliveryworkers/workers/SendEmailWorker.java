@@ -83,11 +83,12 @@ public class SendEmailWorker {
                     try {
                         sendEmail(recipient, subject, body);
                     } catch (Exception e) {
+                        System.out.println("SEND_EMAIL delivery failed: " + e.getMessage());
                         externalTaskService.handleFailure(
                                 externalTask,
                                 "SEND_EMAIL delivery failed",
                                 e.getMessage(),
-                                3,
+                                nextRetries(externalTask),
                                 60000
                         );
                         return;
@@ -147,6 +148,14 @@ public class SendEmailWorker {
         } catch (Exception e) {
             throw new IllegalStateException("SMTP send failed: " + e.getMessage(), e);
         }
+    }
+
+    private int nextRetries(org.camunda.bpm.client.task.ExternalTask externalTask) {
+        Integer retries = externalTask.getRetries();
+        if (retries == null) {
+            return 3;
+        }
+        return Math.max(retries - 1, 0);
     }
 
     private String recipientForActivity(String activityId, org.camunda.bpm.client.task.ExternalTask externalTask) {

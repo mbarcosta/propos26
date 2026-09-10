@@ -1,6 +1,8 @@
 package br.edu.ifes.deliveryworkers.workers;
 
 import org.camunda.bpm.client.ExternalTaskClient;
+import org.camunda.bpm.client.task.ExternalTask;
+import org.camunda.bpm.client.task.ExternalTaskService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -28,33 +30,40 @@ public class RegisterAdvisorshipWorker {
 
     @PostConstruct
     public void subscribe() {
-        client.subscribe("REGISTER_ADVISORSHIP")
+        subscribeTopic("CREATE_ADVISORSHIP");
+        subscribeTopic("REGISTER_ADVISORSHIP");
+    }
+
+    private void subscribeTopic(String topicName) {
+        client.subscribe(topicName)
                 .lockDuration(10000)
-                .handler((externalTask, externalTaskService) -> {
-                    Map<String, Object> payload = new HashMap<>();
-                    payload.put("studentId", longVariable(externalTask.getVariable("studentId")));
-                    payload.put("advisorId", longVariable(externalTask.getVariable("advisorId")));
-                    payload.put("title", stringVariable(externalTask.getVariable("title"), "Untitled advisorship"));
-                    payload.put("researchArea", stringVariable(externalTask.getVariable("researchArea"), "Information Systems"));
-                    payload.put("startDate", stringVariable(externalTask.getVariable("startDate"), LocalDate.now().toString()));
-                    payload.put("status", "IN_PROGRESS");
-
-                    ResponseEntity<Map> response = restTemplate.postForEntity(
-                            ppgManagementBaseUrl + "/api/advisorships",
-                            payload,
-                            Map.class
-                    );
-
-                    Object advisorshipId = response.getBody() == null ? null : response.getBody().get("id");
-                    externalTaskService.complete(
-                            externalTask,
-                            Map.of(
-                                    "advisorshipRegistered", true,
-                                    "advisorshipId", advisorshipId == null ? "" : String.valueOf(advisorshipId)
-                            )
-                    );
-                })
+                .handler(this::handleTask)
                 .open();
+    }
+
+    private void handleTask(ExternalTask externalTask, ExternalTaskService externalTaskService) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("studentId", longVariable(externalTask.getVariable("studentId")));
+        payload.put("advisorId", longVariable(externalTask.getVariable("advisorId")));
+        payload.put("title", stringVariable(externalTask.getVariable("title"), "Untitled advisorship"));
+        payload.put("researchArea", stringVariable(externalTask.getVariable("researchArea"), "Information Systems"));
+        payload.put("startDate", stringVariable(externalTask.getVariable("startDate"), LocalDate.now().toString()));
+        payload.put("status", "IN_PROGRESS");
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                ppgManagementBaseUrl + "/api/advisorships",
+                payload,
+                Map.class
+        );
+
+        Object advisorshipId = response.getBody() == null ? null : response.getBody().get("id");
+        externalTaskService.complete(
+                externalTask,
+                Map.of(
+                        "advisorshipRegistered", true,
+                        "advisorshipId", advisorshipId == null ? "" : String.valueOf(advisorshipId)
+                )
+        );
     }
 
     private Long longVariable(Object value) {
@@ -71,4 +80,3 @@ public class RegisterAdvisorshipWorker {
         return String.valueOf(value);
     }
 }
-

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -111,19 +112,28 @@ public class CirRouteRepository {
         start.setAction("START_PROCESS");
         start.setMessageName("VINCULACAO_SOLICITADA");
         start.setProcessDefinitionKey("vinculacao_orientacao");
-        start.setBusinessKeyVariable("requestId");
-        start.setCorrelationVariable("requestId");
+        start.setBusinessKeyVariable("correlationId");
+        start.setCorrelationVariable("correlationId");
         start.setSubjectContains("vinculacao");
 
-        CirRouteDefinition reply = new CirRouteDefinition();
-        reply.setExternalEvent("EMAIL_REPLY");
-        reply.setAction("CORRELATE_MESSAGE");
-        reply.setMessageName("EMAIL_REPLY");
-        reply.setCorrelationVariable("correlationId");
-
         CirRouteConfig config = new CirRouteConfig();
-        config.setRoutes(List.of(start, reply));
+        List<CirRouteDefinition> routes = new ArrayList<>();
+        routes.add(start);
+        routes.add(replyRoute("DADOS_COMPLEMENTARES"));
+        routes.add(replyRoute("CONFIRMACAO_ESTUDANTE"));
+        routes.add(replyRoute("CONFIRMACAO_COORDENADOR"));
+        config.setRoutes(routes);
         return config;
+    }
+
+    private CirRouteDefinition replyRoute(String messageName) {
+        CirRouteDefinition reply = new CirRouteDefinition();
+        reply.setExternalEvent(messageName);
+        reply.setAction("CORRELATE_MESSAGE");
+        reply.setMessageName(messageName);
+        reply.setCorrelationVariable("correlationId");
+        reply.setCorrelationExpression("${correlationId}");
+        return reply;
     }
 
     private String normalize(String value) {

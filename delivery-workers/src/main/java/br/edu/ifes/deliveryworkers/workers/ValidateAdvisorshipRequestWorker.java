@@ -1,6 +1,8 @@
 package br.edu.ifes.deliveryworkers.workers;
 
 import org.camunda.bpm.client.ExternalTaskClient;
+import org.camunda.bpm.client.task.ExternalTask;
+import org.camunda.bpm.client.task.ExternalTaskService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -32,52 +34,62 @@ public class ValidateAdvisorshipRequestWorker {
 
     @PostConstruct
     public void subscribe() {
-        client.subscribe("VALIDATE_ADVISORSHIP_REQUEST")
+        subscribeTopic("CHECK_ADVISORSHIP");
+        subscribeTopic("VALIDATE_ADVISORSHIP_REQUEST");
+    }
+
+    private void subscribeTopic(String topicName) {
+        client.subscribe(topicName)
                 .lockDuration(10000)
-                .handler((externalTask, externalTaskService) -> {
-                    List<String> missing = new ArrayList<>();
-                    Object studentId = externalTask.getVariable("studentId");
-                    Object advisorId = externalTask.getVariable("advisorId");
-                    Object requestedStudentName = externalTask.getVariable("studentName");
-                    Object requestedAdvisorName = externalTask.getVariable("advisorName");
-                    Object requestedStudentEmail = externalTask.getVariable("studentEmail");
-                    Object requestedAdvisorEmail = externalTask.getVariable("advisorEmail");
-                    Object requester = externalTask.getVariable("from");
-
-                    require(externalTask.getVariable("title"), "title", missing);
-                    require(externalTask.getVariable("researchArea"), "researchArea", missing);
-
-                    Map<String, Object> variables = new HashMap<>();
-                    ResolvedPerson student = resolvePerson("student", "students", studentId, requestedStudentName, requestedStudentEmail, missing);
-                    ResolvedPerson advisor = resolvePerson("advisor", "professors", advisorId, requestedAdvisorName, requestedAdvisorEmail, missing);
-                    addResolvedPersonVariables("student", student, variables);
-                    addResolvedPersonVariables("advisor", advisor, variables);
-                    addProgramVariables(variables, missing);
-
-                    boolean alreadyLinked = student.id() != null
-                            && advisor.id() != null
-                            && advisorshipExists(student.id(), advisor.id());
-                    if (alreadyLinked) {
-                        missing.add("existingAdvisorship");
-                        variables.put("existingAdvisorship", true);
-                    }
-
-                    boolean complete = missing.isEmpty();
-                    variables.put("complete", complete);
-                    variables.put("missingFields", String.join(",", missing));
-                    variables.put("demandValidated", complete);
-                    if (!complete) {
-                        variables.put("emailTo", stringValue(requester));
-                        variables.put("emailSubject", "Pendencia na solicitacao de vinculacao");
-                        variables.put("emailBody", feedbackMessage(missing));
-                    }
-
-                    externalTaskService.complete(
-                            externalTask,
-                            variables
-                    );
-                })
+                .handler(this::handleTask)
                 .open();
+    }
+
+    private void handleTask(ExternalTask externalTask, ExternalTaskService externalTaskService) {
+        List<String> missing = new ArrayList<>();
+        Object studentId = externalTask.getVariable("studentId");
+        Object advisorId = externalTask.getVariable("advisorId");
+        Object requestedStudentName = externalTask.getVariable("studentName");
+        Object requestedAdvisorName = externalTask.getVariable("advisorName");
+        Object requestedStudentEmail = externalTask.getVariable("studentEmail");
+        Object requestedAdvisorEmail = externalTask.getVariable("advisorEmail");
+        Object requester = externalTask.getVariable("from");
+
+        require(externalTask.getVariable("title"), "title", missing);
+        require(externalTask.getVariable("researchArea"), "researchArea", missing);
+
+        Map<String, Object> variables = new HashMap<>();
+        ResolvedPerson student = resolvePerson("student", "students", studentId, requestedStudentName, requestedStudentEmail, missing);
+        ResolvedPerson advisor = resolvePerson("advisor", "professors", advisorId, requestedAdvisorName, requestedAdvisorEmail, missing);
+        addResolvedPersonVariables("student", student, variables);
+        addResolvedPersonVariables("advisor", advisor, variables);
+        addProgramVariables(variables, missing);
+
+        boolean alreadyLinked = student.id() != null
+                && advisor.id() != null
+                && advisorshipExists(student.id(), advisor.id());
+        if (alreadyLinked) {
+            missing.add("existingAdvisorship");
+            variables.put("existingAdvisorship", true);
+        }
+
+        boolean complete = missing.isEmpty();
+        variables.put("complete", complete);
+        variables.put("dadosCompletos", complete);
+        variables.put("missingFields", String.join(",", missing));
+        variables.put("demandValidated", complete);
+        variables.put("valid", complete);
+        variables.put("reason", String.join(",", missing));
+        if (!complete) {
+            variables.put("emailTo", stringValue(requester));
+            variables.put("emailSubject", "Pendencia na solicitacao de vinculacao");
+            variables.put("emailBody", feedbackMessage(missing));
+        }
+
+        externalTaskService.complete(
+                externalTask,
+                variables
+        );
     }
 
     private void require(Object value, String field, List<String> missing) {

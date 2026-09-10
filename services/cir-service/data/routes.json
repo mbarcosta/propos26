@@ -10,11 +10,25 @@
       "subjectContains": "vinculacao"
     },
     {
-      "externalEvent": "EMAIL_REPLY",
+      "externalEvent": "DADOS_COMPLEMENTARES",
       "action": "CORRELATE_MESSAGE",
-      "messageName": "EMAIL_REPLY",
-      "correlationVariable": "correlationId"
+      "messageName": "DADOS_COMPLEMENTARES",
+      "correlationVariable": "correlationId",
+      "correlationExpression": "${correlationId}"
+    },
+    {
+      "externalEvent": "CONFIRMACAO_ESTUDANTE",
+      "action": "CORRELATE_MESSAGE",
+      "messageName": "CONFIRMACAO_ESTUDANTE",
+      "correlationVariable": "correlationId",
+      "correlationExpression": "${correlationId}"
+    },
+    {
+      "externalEvent": "CONFIRMACAO_COORDENADOR",
+      "action": "CORRELATE_MESSAGE",
+      "messageName": "CONFIRMACAO_COORDENADOR",
+      "correlationVariable": "correlationId",
+      "correlationExpression": "${correlationId}"
     }
   ]
 }
-
