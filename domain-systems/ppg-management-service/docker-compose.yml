@@ -9,14 +9,10 @@ services:
       PPG_DATA_FILE: /data/ppg-management.json
       PPG_DOCUMENTS_DIR: /documents
     volumes:
-      - ppg-management-data:/data
-      - ppg-management-documents:/documents
+      - ./data:/data
+      - ./data/documents:/documents
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8090/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
-
-volumes:
-  ppg-management-data:
-  ppg-management-documents:

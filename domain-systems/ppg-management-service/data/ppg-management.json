@@ -1,10 +1,51 @@
 {
-  "studentSequence" : 0,
-  "professorSequence" : 0,
+  "studentSequence" : 4,
+  "professorSequence" : 3,
   "programSequence" : 1,
-  "advisorshipSequence" : 0,
-  "students" : [ ],
-  "professors" : [ ],
+  "advisorshipSequence" : 3,
+  "defenseSequence" : 0,
+  "documentSequence" : 0,
+  "students" : [ {
+    "id" : 1,
+    "registration" : "2026001",
+    "name" : "Maria Silva",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 2,
+    "registration" : "2026001",
+    "name" : "Aluno1",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 3,
+    "registration" : "20261",
+    "name" : "Mateus Conrad",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 4,
+    "registration" : "202602",
+    "name" : "Aline",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  } ],
+  "professors" : [ {
+    "id" : 1,
+    "name" : "Joao Souza",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 2,
+    "name" : "Orientador1",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 3,
+    "name" : "Oirentador1",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  } ],
   "programs" : [ {
     "id" : 1,
     "name" : "Programa de Pos Graduacao em Computacao Aplicada",
@@ -13,5 +54,31 @@
     "coordinatorName" : "Leandro Colombi Resendo",
     "coordinatorEmail" : "mcostaifes@gmail.com"
   } ],
-  "advisorships" : [ ]
+  "advisorships" : [ {
+    "id" : 1,
+    "studentId" : 2,
+    "advisorId" : 2,
+    "title" : "Automacao de Processos de Negocio",
+    "researchArea" : "Sistemas de Informacao",
+    "startDate" : [ 2026, 9, 1 ],
+    "status" : "CANCELLED"
+  }, {
+    "id" : 2,
+    "studentId" : 3,
+    "advisorId" : 1,
+    "title" : "Automacao de Processos de Negocio Quanticos",
+    "researchArea" : "Sistemas de Informacao",
+    "startDate" : [ 2026, 9, 10 ],
+    "status" : "CANCELLED"
+  }, {
+    "id" : 3,
+    "studentId" : 4,
+    "advisorId" : 1,
+    "title" : "Entrevistas de Processos",
+    "researchArea" : "Computação",
+    "startDate" : [ 2026, 9, 15 ],
+    "status" : "IN_PROGRESS"
+  } ],
+  "defenses" : [ ],
+  "dissertationDocuments" : [ ]
 }

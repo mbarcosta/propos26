@@ -45,16 +45,10 @@ services:
       GMS_BASE_URL: ${GMS_BASE_URL:-http://gms:8081}
       CIR_ROUTES_FILE: ${CIR_ROUTES_FILE:-/config/routes.json}
     volumes:
-      - cir-routes:/config
+      - ./services/cir-service/data:/config
     depends_on:
       - camunda7
       - gms
-
-  cpf-service:
-    build: ./services/cpf-service
-    container_name: propos26-cpf-service
-    ports:
-      - "${CPF_PORT:-8083}:8080"
 
   automation-workers:
     build: ./delivery-workers
@@ -74,6 +68,3 @@ services:
       MAIL_SEND_ENABLED: ${MAIL_SEND_ENABLED:-true}
     depends_on:
       - camunda7
-
-volumes:
-  cir-routes:

@@ -1,5 +1,6 @@
 package br.ifes.cir.domain.rule;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -57,6 +58,9 @@ public class MessageEventClassifier {
 
     private static final Pattern CORRELATION_TOKEN_PATTERN =
             Pattern.compile("(?i)(?:^|[^A-Za-z0-9])((?:MSG|VINC|DEF)-[A-Za-z0-9][A-Za-z0-9\\-_./]*)(?:$|[^A-Za-z0-9])");
+
+    private static final Pattern LOOSE_CORRELATION_TOKEN_PATTERN =
+            Pattern.compile("(?i)(?:^|[^A-Za-z0-9])((?:MSG|VINC|DEF)[\\s_]+[A-Za-z0-9][A-Za-z0-9\\-_./]*)(?:$|[^A-Za-z0-9])");
 
     /**
      * Padrão alternativo para extração de chave entre colchetes no assunto.
@@ -121,6 +125,25 @@ public class MessageEventClassifier {
         }
 
         return result;
+    }
+
+    public String explainIgnoredMessage(GmsMessage message) {
+        if (message == null) {
+            return "Mensagem nula recebida do GMS.";
+        }
+        if (store.isProcessed(message.getMessageId())) {
+            return "Mensagem ignorada porque o messageId ja foi marcado como processado nesta instancia do CIR.";
+        }
+        String subject = defaultString(message.getSubject());
+        String body = defaultString(message.getBody());
+        String correlationId = extractCorrelationId(subject, body);
+        if (correlationId != null) {
+            return "A mensagem contem correlationId, mas nao foi classificada; verifique as rotas CIR e os logs de erro.";
+        }
+        if (looksLikeReply(normalize(subject))) {
+            return "Parece uma resposta de e-mail, mas nao contem correlationId reconhecivel. Inclua o identificador MSG-... no assunto ou no corpo.";
+        }
+        return "Nao contem correlationId e o assunto nao corresponde a uma rota de inicio configurada.";
     }
 
     /**
@@ -188,6 +211,19 @@ public class MessageEventClassifier {
             return buildStartMessage(message, configuredStart.get());
         }
 
+        if (normalizedSubject.contains("vinculacao")) {
+            ClassifiedMessage classified = baseMessage(message);
+            classified.setKind(MessageClassificationKind.START);
+            classified.setMessageName("VINCULACAO_SOLICITADA");
+            classified.addVariable("demandRecognized", true);
+            classified.addVariable("demandType", "VINCULACAO_SOLICITADA");
+            classified.addVariable("externalEvent", "VINCULACAO_SOLICITADA");
+            classified.addVariable("correlationVariable", "correlationId");
+            classified.addVariable("requesterEmail", message.getFrom());
+            addAdvisorshipRequestVariables(classified, message);
+            return classified;
+        }
+
         if (normalizedSubject.contains("defesa")) {
             ClassifiedMessage classified = baseMessage(message);
             classified.setKind(MessageClassificationKind.START);
@@ -220,6 +256,7 @@ public class MessageEventClassifier {
         classified.setMessageName("EMAIL_REPLY");
         classified.setCorrelationId(correlationId);
         classified.addVariable("correlationId", correlationId);
+        addAdvisorshipRequestVariables(classified, message);
         return classified;
     }
 
@@ -258,8 +295,8 @@ public class MessageEventClassifier {
         addStringVariable(classified, "advisorName", extractField(text, "advisorName", "orientador", "professor"));
         addStringVariable(classified, "studentEmail", extractField(text, "studentEmail", "emailEstudante", "emailAluno"));
         addStringVariable(classified, "advisorEmail", extractField(text, "advisorEmail", "emailOrientador", "emailProfessor"));
-        addStringVariable(classified, "title", extractField(text, "title", "titulo"));
-        addStringVariable(classified, "researchArea", extractField(text, "researchArea", "areaPesquisa", "area"));
+        addStringVariable(classified, "title", extractField(text, "title", "titulo", "título"));
+        addStringVariable(classified, "researchArea", extractField(text, "researchArea", "areaPesquisa", "area pesquisa", "área pesquisa", "area", "área"));
     }
 
     private void addLongVariable(ClassifiedMessage classified, String variableName, String value) {
@@ -280,15 +317,32 @@ public class MessageEventClassifier {
     }
 
     private String extractField(String text, String... labels) {
-        for (String label : labels) {
-            Pattern pattern = Pattern.compile(
-                    "(?im)^\\s*" + Pattern.quote(label) + "\\s*[:=]\\s*(.+?)\\s*$");
-            Matcher matcher = pattern.matcher(text);
-            if (matcher.find()) {
-                return matcher.group(1);
+        for (String line : defaultString(text).split("\\R")) {
+            int separatorIndex = firstFieldSeparatorIndex(line);
+            if (separatorIndex < 0) {
+                continue;
+            }
+            String key = normalize(line.substring(0, separatorIndex).trim());
+            String value = line.substring(separatorIndex + 1).trim();
+            for (String label : labels) {
+                if (key.equals(normalize(label)) && !value.isBlank()) {
+                    return value;
+                }
             }
         }
         return null;
+    }
+
+    private int firstFieldSeparatorIndex(String line) {
+        int colon = line.indexOf(':');
+        int equals = line.indexOf('=');
+        if (colon < 0) {
+            return equals;
+        }
+        if (equals < 0) {
+            return colon;
+        }
+        return Math.min(colon, equals);
     }
 
     /**
@@ -410,6 +464,11 @@ public class MessageEventClassifier {
             return cleanCorrelationId(matcher.group(1));
         }
 
+        matcher = LOOSE_CORRELATION_TOKEN_PATTERN.matcher(text);
+        if (matcher.find()) {
+            return cleanCorrelationId(matcher.group(1));
+        }
+
         return null;
     }
 
@@ -441,7 +500,7 @@ public class MessageEventClassifier {
         if (value == null) {
             return null;
         }
-        return value.replaceAll("[.,;:]+$", "");
+        return value.replaceAll("[\\s_]+", "-").replaceAll("[.,;:]+$", "");
     }
 
     /**
@@ -457,7 +516,8 @@ public class MessageEventClassifier {
      * @return texto normalizado
      */
     private String normalize(String value) {
-        return defaultString(value)
+        return Normalizer.normalize(defaultString(value), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
                 .toLowerCase(Locale.ROOT)
                 .replace("á", "a")
                 .replace("à", "a")

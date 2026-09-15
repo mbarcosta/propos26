@@ -1,15 +1,20 @@
 package br.ifes.cir.service;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
 import br.ifes.cir.client.CamundaClient;
 import br.ifes.cir.client.GmsClient;
+import br.ifes.cir.client.dto.GmsMessage;
 import br.ifes.cir.client.dto.GmsPollResult;
 import br.ifes.cir.client.dto.VariableValue;
 import br.ifes.cir.domain.model.CirExecutionResult;
+import br.ifes.cir.domain.model.IgnoredMessage;
 import br.ifes.cir.domain.rule.ClassifiedMessage;
 import br.ifes.cir.domain.rule.MessageClassificationKind;
 import br.ifes.cir.domain.rule.MessageEventClassifier;
@@ -273,11 +278,34 @@ public class CirService {
         result.setBindingId(gmsResult.getBindingId());
         result.setTotalRead(gmsResult.getTotalRead());
         result.setIdentifiedEvents(classifiedMessages);
+        result.setIgnoredMessages(ignoredMessages(gmsResult.getMessages(), classifiedMessages));
         System.out.println("classifiedMessages.size() = " + classifiedMessages.size());
         result.setTotalEventsIdentified(classifiedMessages.size());
         
 
         return result;
+    }
+
+    private List<IgnoredMessage> ignoredMessages(List<GmsMessage> messages, List<ClassifiedMessage> classifiedMessages) {
+        Set<String> identifiedIds = new HashSet<>();
+        for (ClassifiedMessage classified : classifiedMessages) {
+            identifiedIds.add(classified.getMessageId());
+        }
+
+        List<IgnoredMessage> ignored = new ArrayList<>();
+        if (messages == null) {
+            return ignored;
+        }
+        for (GmsMessage message : messages) {
+            if (!identifiedIds.contains(message.getMessageId())) {
+                ignored.add(new IgnoredMessage(
+                        message.getMessageId(),
+                        message.getFrom(),
+                        message.getSubject(),
+                        classifier.explainIgnoredMessage(message)));
+            }
+        }
+        return ignored;
     }
 
     /**

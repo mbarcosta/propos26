@@ -9,7 +9,7 @@
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
       <bpmn:messageEventDefinition id="Start_Message" messageRef="Message_VinculacaoSolicitada" />
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_VerificarDados" name="Verificar dados" camunda:type="external" camunda:topic="VALIDATE_ADVISORSHIP_REQUEST">
+    <bpmn:serviceTask id="Task_VerificarDados" name="Verificar dados" camunda:type="external" camunda:topic="CHECK_ADVISORSHIP">
       <bpmn:incoming>Flow_1</bpmn:incoming>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -45,7 +45,7 @@
       <bpmn:outgoing>Flow_8</bpmn:outgoing>
       <bpmn:messageEventDefinition id="Catch_Coordenador_Message" messageRef="Message_ConfirmacaoCoordenador" />
     </bpmn:intermediateCatchEvent>
-    <bpmn:serviceTask id="Task_RegistrarOrientacao" name="Registrar orientacao" camunda:type="external" camunda:topic="REGISTER_ADVISORSHIP">
+    <bpmn:serviceTask id="Task_RegistrarOrientacao" name="Registrar orientacao" camunda:type="external" camunda:topic="CREATE_ADVISORSHIP">
       <bpmn:incoming>Flow_8</bpmn:incoming>
       <bpmn:outgoing>Flow_9</bpmn:outgoing>
     </bpmn:serviceTask>

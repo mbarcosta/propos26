@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.text.Normalizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,7 +60,10 @@ public class CirRouteRepository {
             return exactRoute;
         }
 
-        if (text.contains("dados complementares") || text.contains("pendencia")) {
+        if (text.contains("dados complementares")
+                || text.contains("informar dados corretamente")
+                || text.contains("dados corretos")
+                || text.contains("pendencia")) {
             return findReplyRouteByExternalEvent(replyRoutes, "DADOS_COMPLEMENTARES");
         }
         if (text.contains("confirmacao final") || text.contains("coordenador")) {
@@ -140,6 +144,8 @@ public class CirRouteRepository {
         if (value == null) {
             return "";
         }
-        return value.toLowerCase(Locale.ROOT);
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
     }
 }

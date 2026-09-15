@@ -32,6 +32,31 @@ const LEGACY_CAPABILITY_ALIASES = {
   REGISTER_ADVISORSHIP: 'CREATE_ADVISORSHIP',
   VALIDATE_REQUEST: 'CHECK_ADVISORSHIP'
 };
+const INBOUND_DATA_SCHEMAS = {
+  EMAIL: {
+    id: 'EMAIL',
+    label: 'E-mail',
+    provider: 'GMS',
+    router: 'CIR',
+    fields: [
+      { source: 'from', label: 'Remetente', type: 'String', variable: 'requesterEmail', expression: '${email.from}' },
+      { source: 'subject', label: 'Assunto', type: 'String', variable: 'subject', expression: '${email.subject}' },
+      { source: 'body', label: 'Corpo', type: 'String', variable: 'body', expression: '${email.body}' },
+      { source: 'to', label: 'Destinatarios', type: 'Array<String>', variable: 'recipients', expression: '${email.to}' },
+      { source: 'cc', label: 'Copia', type: 'Array<String>', variable: 'cc', expression: '${email.cc}' },
+      { source: 'messageId', label: 'Identificador da mensagem', type: 'String', variable: 'messageId', expression: '${email.messageId}' },
+      { source: 'hasAttachments', label: 'Possui anexos', type: 'Boolean', variable: 'hasAttachments', expression: '${email.hasAttachments}' },
+      { source: 'studentId', label: 'ID do estudante informado', type: 'Long', variable: 'studentId', expression: '${payload.studentId}', origin: 'CIR labeled field' },
+      { source: 'advisorId', label: 'ID do orientador informado', type: 'Long', variable: 'advisorId', expression: '${payload.advisorId}', origin: 'CIR labeled field' },
+      { source: 'studentEmail', label: 'E-mail do estudante', type: 'String', variable: 'studentEmail', expression: '${payload.studentEmail}', origin: 'CIR labeled field' },
+      { source: 'advisorEmail', label: 'E-mail do orientador', type: 'String', variable: 'advisorEmail', expression: '${payload.advisorEmail}', origin: 'CIR labeled field' },
+      { source: 'studentName', label: 'Nome do estudante', type: 'String', variable: 'studentName', expression: '${payload.studentName}', origin: 'CIR labeled field' },
+      { source: 'advisorName', label: 'Nome do orientador', type: 'String', variable: 'advisorName', expression: '${payload.advisorName}', origin: 'CIR labeled field' },
+      { source: 'title', label: 'Titulo do trabalho', type: 'String', variable: 'title', expression: '${payload.title}', origin: 'CIR labeled field' },
+      { source: 'researchArea', label: 'Area de pesquisa', type: 'String', variable: 'researchArea', expression: '${payload.researchArea}', origin: 'CIR labeled field' }
+    ]
+  }
+};
 
 const referenceXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Vinculacao" targetNamespace="http://propos26.local/bpmn">
@@ -44,7 +69,7 @@ const referenceXml = `<?xml version="1.0" encoding="UTF-8"?>
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
       <bpmn:messageEventDefinition id="Start_Message" messageRef="Message_VinculacaoSolicitada" />
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_VerificarDados" name="Verificar dados" camunda:type="external" camunda:topic="VALIDATE_ADVISORSHIP_REQUEST">
+    <bpmn:serviceTask id="Task_VerificarDados" name="Verificar dados" camunda:type="external" camunda:topic="CHECK_ADVISORSHIP">
       <bpmn:incoming>Flow_1</bpmn:incoming>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -80,7 +105,7 @@ const referenceXml = `<?xml version="1.0" encoding="UTF-8"?>
       <bpmn:outgoing>Flow_8</bpmn:outgoing>
       <bpmn:messageEventDefinition id="Catch_Coordenador_Message" messageRef="Message_ConfirmacaoCoordenador" />
     </bpmn:intermediateCatchEvent>
-    <bpmn:serviceTask id="Task_RegistrarOrientacao" name="Registrar orientacao" camunda:type="external" camunda:topic="REGISTER_ADVISORSHIP">
+    <bpmn:serviceTask id="Task_RegistrarOrientacao" name="Registrar orientacao" camunda:type="external" camunda:topic="CREATE_ADVISORSHIP">
       <bpmn:incoming>Flow_8</bpmn:incoming>
       <bpmn:outgoing>Flow_9</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -154,7 +179,9 @@ function emptyBpmnXml(projectKey = 'automation_process', projectName = 'Automati
 }
 
 function project() {
-  const inboundIntegrations = Object.values(state.inboundConfigs || {});
+  const startIntegration = currentStartIntegration();
+  const inboundIntegrations = Object.values(state.inboundConfigs || {})
+    .filter((config) => config.action !== 'START_PROCESS');
   const outboundIntegrations = Object.values(state.outboundConfigs || {});
   const capabilityBindings = Object.entries(state.bindings || {}).map(([bpmnElementId, capabilityId]) => ({
     bpmnElementId,
@@ -199,16 +226,44 @@ function project() {
     generatedComponents: state.generatedComponents || [],
     deploymentConfiguration: {
       processConfig: state.processConfig,
-      integration: state.integration
+      integration: startIntegration
     },
     deploymentHistory: state.deploymentHistory || [],
     wizardSession: state.wizardSession,
     flowConditions: state.flowConditions,
     processConfig: state.processConfig,
-    integration: state.integration,
+    integration: startIntegration,
     status: state.status,
     lastModified: state.lastSavedAt || new Date().toISOString()
   };
+}
+
+function currentStartIntegration() {
+  const startStep = buildWizardSteps()
+    .find((step) => step.kind === 'START_MESSAGE_EVENT');
+  if (!startStep) {
+    return state.integration || {};
+  }
+  const guided = normalizeGuidedInboundConfig(
+    startStep,
+    state.inboundConfigs[startStep.elementId] || defaultWizardInboundConfig(startStep)
+  );
+  return {
+    ...(state.integration || {}),
+    channel: guided.channel,
+    externalEvent: guided.externalEvent,
+    camundaMessage: guided.camundaMessage,
+    correlationField: guided.correlationField || 'correlationId',
+    correlationExpression: guided.correlationExpression || '${correlationId}',
+    subjectContains: guided.subjectContains || startSubjectContains(guided.externalEvent)
+  };
+}
+
+function startSubjectContains(externalEvent) {
+  if (externalEvent === 'VINCULACAO_SOLICITADA') {
+    return 'vinculacao';
+  }
+  return (externalEvent || '').toLowerCase().replaceAll('_', ' ');
 }
 
 async function loadXml() {
@@ -257,14 +312,17 @@ function seedExampleProjects() {
       bpmnXml: referenceXml,
       requirements: [],
       derivedConfig: { variables: [], topics: [], messages: [], requiredConfigurations: [] },
-      bindings: {},
+      bindings: referenceBindings(),
       variableMappings: {},
       capabilityImplementations: {},
-      inboundConfigs: {},
-      outboundConfigs: {},
-      flowConditions: {},
+      inboundConfigs: referenceInboundConfigs(),
+      outboundConfigs: referenceOutboundConfigs(),
+      flowConditions: {
+        Flow_DadosNao: '${complete == false}',
+        Flow_DadosSim: '${complete == true}'
+      },
       processConfig: { historyTimeToLive: '180' },
-      integration: {},
+      integration: referenceStartIntegration(),
       generatedComponents: [],
       deploymentHistory: [],
       wizardSession: null,
@@ -299,6 +357,74 @@ function seedExampleProjects() {
   }
   writeProjects(projects);
   localStorage.setItem(PROJECT_SEED_STORAGE_KEY, 'true');
+}
+
+function referenceBindings() {
+  return {
+    Task_VerificarDados: 'CHECK_ADVISORSHIP',
+    Task_SolicitarDados: 'SEND_EMAIL',
+    Task_SolicitarConfirmacaoEstudante: 'SEND_EMAIL',
+    Task_SolicitarConfirmacaoCoordenador: 'SEND_EMAIL',
+    Task_RegistrarOrientacao: 'CREATE_ADVISORSHIP'
+  };
+}
+
+function referenceStartIntegration() {
+  return {
+    externalEvent: 'VINCULACAO_SOLICITADA',
+    camundaMessage: 'VINCULACAO_SOLICITADA',
+    processDefinitionKey: 'vinculacao_orientacao',
+    businessKeyVariable: 'correlationId',
+    correlationField: 'correlationId',
+    correlationExpression: '${correlationId}',
+    subjectContains: 'vinculacao'
+  };
+}
+
+function referenceInboundConfigs() {
+  return {
+    Catch_DadosComplementares: referenceInboundConfig('Catch_DadosComplementares', 'DADOS_COMPLEMENTARES'),
+    Catch_ConfirmacaoEstudante: referenceInboundConfig('Catch_ConfirmacaoEstudante', 'CONFIRMACAO_ESTUDANTE'),
+    Catch_ConfirmacaoCoordenador: referenceInboundConfig('Catch_ConfirmacaoCoordenador', 'CONFIRMACAO_COORDENADOR')
+  };
+}
+
+function referenceInboundConfig(elementId, eventName) {
+  return {
+    channel: 'EMAIL',
+    provider: 'GMS',
+    router: 'CIR',
+    action: 'CORRELATE_MESSAGE',
+    bpmnElementId: elementId,
+    externalEvent: eventName,
+    camundaMessage: eventName,
+    correlationField: 'correlationId',
+    correlationExpression: '${correlationId}',
+    variableMappings: defaultVariableMappings()
+  };
+}
+
+function referenceOutboundConfigs() {
+  return {
+    Task_SolicitarDados: {
+      bpmnElementId: 'Task_SolicitarDados',
+      emailTo: '${requesterEmail}',
+      emailSubject: 'Informar Dados Corretamente. ${correlationId}',
+      emailBody: 'Por favor envie os dados corretos de orientacao.'
+    },
+    Task_SolicitarConfirmacaoEstudante: {
+      bpmnElementId: 'Task_SolicitarConfirmacaoEstudante',
+      emailTo: '${studentEmail}',
+      emailSubject: defaultEmailSubject('Task_SolicitarConfirmacaoEstudante'),
+      emailBody: defaultEmailBody('Task_SolicitarConfirmacaoEstudante')
+    },
+    Task_SolicitarConfirmacaoCoordenador: {
+      bpmnElementId: 'Task_SolicitarConfirmacaoCoordenador',
+      emailTo: '${coordinatorEmail}',
+      emailSubject: defaultEmailSubject('Task_SolicitarConfirmacaoCoordenador'),
+      emailBody: defaultEmailBody('Task_SolicitarConfirmacaoCoordenador')
+    }
+  };
 }
 
 function saveProject() {
@@ -1350,7 +1476,7 @@ function normalizeSearchText(value) {
 function defaultInboundConfig(node) {
   const elementId = node.getAttribute('id');
   const name = node.getAttribute('name') || elementId;
-  const eventName = normalizeEventName(name);
+  const eventName = inboundEventNameForWait(name, elementId);
   return {
     channel: 'EMAIL',
     action: 'CORRELATE_MESSAGE',
@@ -1361,6 +1487,20 @@ function defaultInboundConfig(node) {
     correlationExpression: '${correlationId}',
     variableMappings: defaultVariableMappings(downstreamRequiredProcessVariables(elementId))
   };
+}
+
+function inboundEventNameForWait(name, elementId = '') {
+  const text = `${name || ''} ${elementId || ''}`;
+  if (matchesAny(text, 'dados complementares', 'aguardar resposta', 'catch dados')) {
+    return 'DADOS_COMPLEMENTARES';
+  }
+  if (matchesAny(text, 'confirmacao estudante', 'confirmação estudante', 'catch confirmacao estudante')) {
+    return 'CONFIRMACAO_ESTUDANTE';
+  }
+  if (matchesAny(text, 'confirmacao coordenador', 'confirmação coordenador', 'catch confirmacao coordenador')) {
+    return 'CONFIRMACAO_COORDENADOR';
+  }
+  return normalizeEventName(name || elementId);
 }
 
 function defaultVariableMappings(additionalVariables = []) {
@@ -1829,6 +1969,12 @@ function renderWizard() {
   const index = state.wizardSession.currentStep || 0;
   const step = steps[index];
   document.getElementById('wizardProjectName').textContent = document.getElementById('projectName').value;
+  const topStatus = document.getElementById('wizardStepStatus');
+  if (topStatus) {
+    const status = wizardStepStatus(step);
+    topStatus.textContent = localizeWizardStatus(status);
+    topStatus.className = `wizard-top-status ${statusCssClass(status)}`;
+  }
   document.getElementById('wizardProgress').innerHTML = renderWizardProgress(steps, index);
   document.getElementById('wizardContent').innerHTML = renderWizardStep(step);
   document.getElementById('wizardFooterStatus').textContent = `Etapa ${index + 1} de ${steps.length}`;
@@ -1856,6 +2002,21 @@ function wizardStepSymbol(status, current) {
   if (status === 'ERROR') return '!';
   if (status === 'WARNING') return '~';
   return '○';
+}
+
+function localizeWizardStatus(status) {
+  const labels = {
+    NOT_CONFIGURED: 'NAO CONFIGURADO',
+    IN_PROGRESS: 'EM CONFIGURACAO',
+    WARNING: 'ATENCAO',
+    ERROR: 'ERRO',
+    CONFIGURED: 'CONFIGURADO'
+  };
+  return labels[status] || status;
+}
+
+function statusCssClass(status) {
+  return localizeWizardStatus(status).toLowerCase().replace(/\s+/g, '-');
 }
 
 function wizardStepStatus(step) {
@@ -1968,14 +2129,14 @@ function renderInboundWizard(step) {
         <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="externalEvent" value="${escapeAttribute(config.externalEvent || '')}">
         <label>Message Name</label>
         <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="camundaMessage" value="${escapeAttribute(config.camundaMessage || '')}">
-        <label>Correlation Key</label>
-        <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationField" value="${escapeAttribute(config.correlationField || 'requestId')}">
+        <label>Identificador tecnico</label>
+        <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationField" value="${escapeAttribute(config.correlationField || 'correlationId')}">
         <label>Target Process Variable</label>
-        <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationExpression" value="${escapeAttribute(config.correlationExpression || '${requestId}')}">
+        <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationExpression" value="${escapeAttribute(config.correlationExpression || '${correlationId}')}">
       </div>
     </div>
     <div class="wizard-card">
-      <label>Initial Variable Mappings JSON</label>
+      <label>Dados produzidos</label>
       <textarea data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="variableMappings">${escapeHtml(config.variableMappings || defaultVariableMappings())}</textarea>
     </div>`;
 }
@@ -2075,6 +2236,384 @@ function validateCapabilityAndMappings(step, issues) {
       issues.push({ level: 'WARNING', message: `No output variable was defined for "${parameter.name}".` });
     }
   });
+}
+
+function renderTutorialIntro(step) {
+  if (step.kind === 'START_MESSAGE_EVENT') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao do inicio do processo - ${escapeHtml(step.name)}</h3>
+        <p>Para uma nova execucao do processo iniciar, este evento deve ser identificado pelo sistema de automacao.</p>
+        <p>Para configurar essa captura e preciso: <strong>I.</strong> Associar o evento a um canal e a um tipo de entrada. <strong>II.</strong> Definir quais dados recebidos com o evento serao disponibilizados para utilizacao pelo processo.</p>
+      </div>`;
+  }
+  if (step.kind === 'SERVICE_TASK') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da tarefa "${escapeHtml(step.name)}"</h3>
+        <p>Esta tarefa sera executada por uma funcionalidade do ambiente. O wizard mostra o que a funcionalidade faz, quais dados ela precisa receber e quais resultados entregara ao processo.</p>
+      </div>`;
+  }
+  if (step.kind === 'OUTBOUND_COMMUNICATION') {
+    return `
+      <div class="wizard-card">
+        <h3>Envio de mensagem - ${escapeHtml(step.name)}</h3>
+        <p>Defina a intencao do envio: para quem enviar, qual assunto, qual mensagem e se um identificador precisa acompanhar a resposta futura.</p>
+      </div>`;
+  }
+  if (step.kind === 'INBOUND_EVENT') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da espera por mensagem - ${escapeHtml(step.name)}</h3>
+        <p>Neste ponto o processo ja existe e ficara aguardando uma mensagem. A correlacao pertence aqui: o CIR precisa reconhecer qual instancia recebera a resposta.</p>
+      </div>`;
+  }
+  if (step.kind === 'GATEWAY') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da decisao "${escapeHtml(step.name)}"</h3>
+        <p>Este ponto decide qual caminho o processo seguira. Escolha um dado produzido anteriormente e defina quando cada caminho deve ser utilizado.</p>
+        ${renderPreviousProducerHint(step)}
+      </div>`;
+  }
+  return `
+    <div class="wizard-card">
+      <h3>Revisao do elemento "${escapeHtml(step.name)}"</h3>
+      <p>Este elemento participa do processo e sera validado para garantir que possui informacoes suficientes.</p>
+    </div>`;
+}
+
+function renderExecutionSummary(step) {
+  if (step.kind === 'START_MESSAGE_EVENT') {
+    const config = state.inboundConfigs[step.elementId] || {};
+    const processName = document.getElementById('projectName').value || 'processo';
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ol>
+          <li>GMS recebe o e-mail.</li>
+          <li>CIR identifica o tipo ${escapeHtml(config.externalEvent || '')}.</li>
+          <li>O evento inicia nova instancia de ${escapeHtml(processName)}.</li>
+          <li>Os campos selecionados sao convertidos em dados do processo.</li>
+          <li>O identificador ${escapeHtml(config.correlationField || 'correlationId')} fica disponivel para correlacoes futuras.</li>
+        </ol>
+      </div>`;
+  }
+  if (step.kind === 'SERVICE_TASK') {
+    const capability = findCapability(state.bindings[step.elementId]);
+    const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ol>
+          <li>O worker le os dados de entrada selecionados no contexto do processo.</li>
+          <li>${escapeHtml(capability?.name || 'A funcionalidade escolhida')} executa a acao configurada.</li>
+          <li>${renderOutputSummaryText(capability, mappings)}</li>
+        </ol>
+      </div>`;
+  }
+  if (step.kind === 'GATEWAY') {
+    const branches = (state.gatewayBranches || []).filter((branch) => branch.gatewayId === step.elementId);
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ul>${branches.map((branch) => `<li>${escapeHtml(readableFlowCondition(branch))} - ${escapeHtml(branch.flowName || branch.targetName || branch.flowId)}</li>`).join('')}</ul>
+      </div>`;
+  }
+  return '';
+}
+
+function renderOutputSummaryText(capability, mappings) {
+  if (!capability) return 'Os resultados configurados entram no contexto para as etapas seguintes.';
+  const outputs = (capability.outputParameters || [])
+    .map((parameter) => `${parameter.name} -> ${(mappings.outputs || {})[parameter.name] || defaultOutputVariableName('', parameter)}`)
+    .join(', ');
+  return outputs ? `Os resultados entram no ProcessDataContext: ${escapeHtml(outputs)}.` : 'Esta funcionalidade nao declara resultados.';
+}
+
+function readableFlowCondition(branch) {
+  const config = state.flowConditions[branch.flowId] || {};
+  if (config.isDefault) return 'caso nenhum outro caminho seja verdadeiro';
+  const visual = config.visual || inferVisualCondition(config.condition, buildProcessDataContext(branch.gatewayId));
+  if (visual?.variable && visual.value) {
+    return `${visual.variable} = ${visual.value === 'true' ? 'verdadeiro' : visual.value === 'false' ? 'falso' : visual.value}`;
+  }
+  return config.condition || 'sem condicao';
+}
+
+function renderTutorialInputMapping(elementId, parameter, context) {
+  const mappings = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+  const value = (mappings.inputs || {})[parameter.name] || '';
+  const expectedType = normalizeCapabilityType(parameter.type);
+  const options = sortedVariablesForType(context.variables, expectedType);
+  const selected = stripExpression(value);
+  const unavailable = !options.length
+    ? `<div class="wizard-message error">A capability precisa de ${escapeHtml(parameter.name)} (${escapeHtml(expectedType)}), mas nenhum dado desse tipo esta disponivel. body (String), quando existir, e texto recebido e nao pode ser usado diretamente como identificador. E necessaria uma etapa/capability anterior que extraia ou identifique esse dado.</div>`
+    : '';
+  return `
+    <div class="wizard-mapping-row">
+      <span>De onde vem ${escapeHtml(friendlyParameterName(parameter.name))}? <small>${escapeHtml(parameter.name)}:${escapeHtml(expectedType)}</small></span>
+      <span>&lt;-</span>
+      <select data-wizard-mapping-input="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}">
+        <option value="">Selecionar dado compativel</option>
+        ${options.map((variable) => `<option value="${escapeAttribute(variable.name)}" ${selected === variable.name ? 'selected' : ''}>${escapeHtml(variable.name)} (${escapeHtml(variable.type)}) - ${escapeHtml(variable.origin)}</option>`).join('')}
+      </select>
+    </div>
+    ${unavailable}`;
+}
+
+function renderTutorialOutputMapping(elementId, parameter) {
+  const mappings = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+  const value = (mappings.outputs || {})[parameter.name] || defaultOutputVariableName(elementId, parameter);
+  if (!((mappings.outputs || {})[parameter.name] || '').trim()) {
+    state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+    state.variableMappings[elementId].outputs = state.variableMappings[elementId].outputs || {};
+    state.variableMappings[elementId].outputs[parameter.name] = value;
+  }
+  return `
+    <div class="wizard-mapping-row">
+      <span>${escapeHtml(friendlyParameterName(parameter.name))} <small>${escapeHtml(parameter.name)}:${escapeHtml(normalizeCapabilityType(parameter.type))}</small></span>
+      <span>-&gt;</span>
+      <input data-wizard-mapping-output="${escapeAttribute(elementId)}" data-param="${escapeAttribute(parameter.name)}" value="${escapeAttribute(value)}">
+    </div>`;
+}
+
+function renderWizardIssues(issues) {
+  if (!issues.length) {
+    return '';
+  }
+  return issues.map((issue) => `<div class="wizard-message ${issue.level.toLowerCase()}">${escapeHtml(localizeIssueLevel(issue.level))}: ${escapeHtml(issue.message)}</div>`).join('');
+}
+
+function validateInboundWizardStep(step, issues) {
+  const config = normalizeGuidedInboundConfig(step, state.inboundConfigs[step.elementId] || defaultWizardInboundConfig(step));
+  state.inboundConfigs[step.elementId] = config;
+  if (!config.channel) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: a fonte de entrada nao foi escolhida. Por que: o wizard precisa saber qual infraestrutura recebera a ocorrencia. Como corrigir: selecione uma fonte disponivel.' });
+  }
+  if (!config.externalEvent) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: falta o evento externo. Por que: o CIR precisa reconhecer que tipo de ocorrencia chegou. Como corrigir: escolha um evento existente ou crie um novo tipo.' });
+  }
+  if (!config.camundaMessage) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: falta a mensagem BPMN. Por que: o Camunda precisa de um nome de mensagem presente no modelo. Como corrigir: selecione uma mensagem do BPMN ou informe uma nova.' });
+  }
+  if (step.kind !== 'START_MESSAGE_EVENT') {
+    const context = buildProcessDataContext(step.elementId);
+    const field = stripExpression(config.correlationField);
+    if (!field) {
+      issues.push({ level: 'ERROR', message: 'O que esta errado: falta o identificador de correlacao. Por que: ja existe uma instancia aguardando resposta. Como corrigir: selecione correlationId ou outro dado String disponivel.' });
+    } else if (!context.variables.some((variable) => variable.name === field && isCompatibleVariableType(variable.type, 'String'))) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${field} nao esta disponivel como String antes desta espera. Por que: o CIR precisa correlacionar a resposta a uma instancia existente. Como corrigir: revise a etapa que deveria produzir esse identificador.` });
+    }
+  }
+  if (config.variableMappings) {
+    try {
+      JSON.parse(config.variableMappings);
+    } catch (error) {
+      issues.push({ level: 'ERROR', message: 'O que esta errado: os dados produzidos nao puderam ser gerados como JSON valido. Por que: essa configuracao tecnica sera enviada ao runtime. Como corrigir: altere a selecao de campos recebidos.' });
+    }
+  }
+}
+
+function renderTechnicalDetails(step) {
+  const capability = findCapability(state.bindings[step.elementId]);
+  const inbound = state.inboundConfigs[step.elementId] || {};
+  const outbound = state.outboundConfigs[step.elementId] || {};
+  const technicalRows = [
+    ['BPMN ID', step.elementId, 'DISCOVERED'],
+    ['BPMN Type', step.bpmnType, 'DISCOVERED'],
+    ['Automation Requirements', step.requirementTypes.join(', '), 'ADVANCED'],
+    ['Inbound Channel', inbound.channel || '', inbound.channel ? 'USER_DECISION' : ''],
+    ['External Event ID', inbound.externalEvent || '', inbound.createNewExternalEvent ? 'USER_DECISION' : 'DISCOVERED'],
+    ['Camunda Message Name', inbound.camundaMessage || '', 'DISCOVERED'],
+    ['Provider GMS', inbound.provider || capability?.provider || '', inbound.provider ? 'DERIVED' : 'DISCOVERED'],
+    ['Router CIR', inbound.router || '', inbound.router ? 'DERIVED' : ''],
+    ['Correlation Variable', inbound.correlationField || '', inbound.correlationField ? 'GENERATED' : ''],
+    ['Expression', inbound.correlationExpression || '', inbound.correlationExpression ? 'GENERATED' : ''],
+    ['Capability ID', capability?.id || '', capability ? 'USER_DECISION' : ''],
+    ['Endpoint REST/Topic', capability?.endpoint || '', capability ? 'DISCOVERED' : ''],
+    ['Worker', capability?.implementation || state.capabilityImplementations[step.elementId]?.implementation || '', capability ? 'DISCOVERED' : ''],
+    ['Outbound To', outbound.emailTo || '', outbound.emailTo ? 'USER_DECISION' : ''],
+    ['Outbound Subject', outbound.emailSubject || '', outbound.emailSubject ? 'USER_DECISION' : '']
+  ].filter((row) => row[1] || row[2]);
+  return `
+    <details class="technical-details">
+      <summary>Ver detalhes tecnicos</summary>
+      <table>
+        <thead><tr><th>Propriedade</th><th>Valor</th><th>Classificacao</th></tr></thead>
+        <tbody>
+          ${technicalRows.map(([name, value, classification]) => `<tr><th>${escapeHtml(name)}</th><td>${escapeHtml(value || '')}</td><td>${escapeHtml(classification || '')}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
+
+function renderOutboundWizard(step) {
+  if (!state.bindings[step.elementId]) {
+    state.bindings[step.elementId] = 'SEND_EMAIL';
+  }
+  const capability = findCapability(state.bindings[step.elementId]);
+  const context = buildProcessDataContext(step.elementId);
+  const needsReplyToken = nextWaitingMessageAfter(step.elementId);
+  const config = normalizeOutboundConfig(step, state.outboundConfigs[step.elementId] || {}, needsReplyToken);
+  state.outboundConfigs[step.elementId] = config;
+  return `
+    <div class="wizard-card">
+      <h3>Intencao do envio</h3>
+      <p>Nesta distribuicao, o envio usa a capability SEND_EMAIL por worker de automacao. O wizard gera os parametros tecnicos a partir da mensagem definida aqui.</p>
+      ${renderWizardCapabilityPicker(step, state.bindings[step.elementId])}
+    </div>
+    <div class="wizard-card">
+      <h3>Mensagem</h3>
+      <label>Para quem enviar?</label>
+      ${renderValueSourcePicker('emailTo', step.elementId, config.emailTo || '', context, 'String', 'data-wizard-outbound')}
+      <label>Qual assunto?</label>
+      <input data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="emailSubject" value="${escapeAttribute(config.emailSubject || suggestedOutboundSubject(step, config, needsReplyToken))}">
+      <label>Qual mensagem?</label>
+      <textarea data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="emailBody">${escapeHtml(config.emailBody || '')}</textarea>
+      <label>E necessario incluir identificador para futura resposta?</label>
+      <select data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="includeCorrelationId">
+        <option value="true" ${config.includeCorrelationId !== 'false' && needsReplyToken ? 'selected' : ''}>Sim</option>
+        <option value="false" ${config.includeCorrelationId === 'false' || !needsReplyToken ? 'selected' : ''}>Nao</option>
+      </select>
+      ${needsReplyToken ? '<div class="wizard-message warning">Ha uma etapa posterior aguardando resposta. A mensagem precisa permitir recuperar correlationId; inclua ${correlationId} no assunto ou no corpo.</div>' : ''}
+      <label>Documento ou link a incluir</label>
+      ${renderValueSourcePicker('attachmentOrLink', step.elementId, config.attachmentOrLink || '', context, 'String', 'data-wizard-outbound')}
+    </div>
+    <div class="wizard-card">
+      <h3>Dados disponiveis para este e-mail</h3>
+      ${renderProcessDataContext(context)}
+    </div>
+    ${capability ? `<div class="wizard-card">${renderCapabilityNeedReturn(capability)}${renderCapabilityMappingEditor(step.elementId, capability, context)}</div>` : ''}`;
+}
+
+function normalizeOutboundConfig(step, rawConfig, needsReplyToken) {
+  const config = {
+    bpmnElementId: step.elementId,
+    ...rawConfig
+  };
+  const expectedRecipient = defaultEmailTo(step.elementId, step.name);
+  if (!config.emailTo || shouldUseSemanticEmailRecipient(step.elementId, config.emailTo)) {
+    config.emailTo = expectedRecipient;
+  }
+  if (!config.emailSubject) {
+    config.emailSubject = suggestedOutboundSubject(step, config, needsReplyToken);
+  }
+  if (!config.emailBody) {
+    config.emailBody = defaultEmailBody(step.elementId, step.name);
+  }
+  if (needsReplyToken && config.includeCorrelationId == null) {
+    config.includeCorrelationId = 'true';
+  }
+  return config;
+}
+
+function shouldUseSemanticEmailRecipient(elementId, value) {
+  const selected = stripExpression(value);
+  if (elementId === 'Task_SolicitarConfirmacaoCoordenador') {
+    return selected !== 'coordinatorEmail';
+  }
+  if (elementId === 'Task_SolicitarConfirmacaoEstudante') {
+    return selected !== 'studentEmail';
+  }
+  return false;
+}
+
+function nextWaitingMessageAfter(elementId) {
+  const steps = state.wizardSession?.steps || buildWizardSteps();
+  const index = steps.findIndex((step) => step.elementId === elementId);
+  return steps.slice(index + 1).find((step) => step.kind === 'INBOUND_EVENT');
+}
+
+function suggestedOutboundSubject(step, config, waitingStep) {
+  if (config.emailSubject) return config.emailSubject;
+  const base = defaultEmailSubject(step.elementId);
+  return waitingStep ? `${base} \${correlationId}` : base;
+}
+
+function validateOutboundWizardStep(step, issues) {
+  if (!state.bindings[step.elementId]) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: falta escolher como enviar. Por que: o processo precisa de uma capability/worker de envio. Como corrigir: selecione SEND_EMAIL ou outra capability compativel.' });
+  }
+  const config = state.outboundConfigs[step.elementId] || {};
+  if (!config.emailTo) issues.push({ level: 'ERROR', message: 'O que esta errado: falta destinatario. Por que: a mensagem precisa saber para quem sera enviada. Como corrigir: escolha um dado do processo ou informe um valor fixo.' });
+  if (!config.emailSubject) issues.push({ level: 'ERROR', message: 'O que esta errado: falta assunto. Por que: o e-mail precisa de assunto e ele pode carregar o identificador de resposta. Como corrigir: informe o assunto.' });
+  if (!config.emailBody) issues.push({ level: 'WARNING', message: 'O que esta errado: a mensagem esta vazia. Por que: o destinatario pode nao saber o que responder. Como corrigir: escreva o conteudo ou selecione um template.' });
+  if (nextWaitingMessageAfter(step.elementId) && !containsCorrelationToken(config.emailSubject, config.emailBody)) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: uma resposta posterior depende de correlationId, mas a mensagem nao contem esse identificador. Por que: o CIR precisa recuperar o identificador na resposta. Como corrigir: inclua ${correlationId} no assunto ou no corpo.' });
+  }
+}
+
+function renderServiceTaskWizard(step) {
+  const capabilityId = state.bindings[step.elementId] || '';
+  const capability = findCapability(capabilityId);
+  const suggestion = suggestCapability(step);
+  const context = buildProcessDataContext(step.elementId);
+  const legacyNotice = legacyCapabilityNotice(step);
+  return `
+    <div class="wizard-card">
+      <h3>O que esta tarefa deve fazer?</h3>
+      <p>Escolha a funcionalidade de negocio que executara esta etapa. A lista prioriza capabilities compativeis com o nome da tarefa e os contratos registrados.</p>
+      ${suggestion ? `<div class="wizard-message info">Sugestao deterministica: ${escapeHtml(suggestion.id)} - ${escapeHtml(suggestion.name)}</div>` : ''}
+      ${legacyNotice}
+      ${renderWizardCapabilityPicker(step, capabilityId)}
+    </div>
+    <div class="wizard-card">
+      <h3>Dados disponiveis antes desta tarefa</h3>
+      ${renderProcessDataContext(context)}
+    </div>
+    ${capability ? `
+      <div class="wizard-card">
+        <h3>${escapeHtml(capability.name)}</h3>
+        <p>${escapeHtml(capability.description || '')}</p>
+        <div class="wizard-grid">
+          <div><strong>O que esta funcionalidade faz?</strong><p>${escapeHtml(capability.description || '')}</p></div>
+          <div><strong>Quem executa?</strong><p>${escapeHtml(capability.provider || '')}</p></div>
+        </div>
+        ${renderCapabilityNeedReturn(capability)}
+        ${renderCapabilityMappingEditor(step.elementId, capability, context)}
+        ${renderCapabilityOutputContextNotice(step, capability)}
+        ${renderRequirementImplementation(step.elementId, capability)}
+      </div>` : ''}`;
+}
+
+function renderCapabilityOutputContextNotice(step, capability) {
+  const mappings = state.variableMappings[step.elementId] || { outputs: {} };
+  const outputs = (capability.outputParameters || [])
+    .map((parameter) => ({
+      parameter,
+      variable: (mappings.outputs || {})[parameter.name] || defaultOutputVariableName(step.elementId, parameter)
+    }));
+  if (!outputs.length) return '';
+  return `<div class="wizard-message info">Resultados adicionados ao ProcessDataContext: ${outputs.map((item) => `${item.variable}:${normalizeCapabilityType(item.parameter.type)} (retorno ${item.parameter.name})`).join(', ')}.</div>`;
+}
+
+function wizardStepStatus(step) {
+  if (step.kind === 'GLOBAL_VALIDATION') return globalWizardValidation().ready ? 'CONFIGURED' : 'ERROR';
+  if (isWizardStepPristine(step)) return 'NOT_CONFIGURED';
+  const issues = validateWizardStep(step);
+  if (issues.some((issue) => issue.level === 'ERROR')) return 'ERROR';
+  if (issues.some((issue) => issue.level === 'WARNING')) return 'WARNING';
+  return 'CONFIGURED';
+}
+
+function isWizardStepPristine(step) {
+  if (!step) return true;
+  if (['START_MESSAGE_EVENT', 'INBOUND_EVENT'].includes(step.kind)) {
+    return !state.inboundConfigs[step.elementId];
+  }
+  if (step.kind === 'SERVICE_TASK') {
+    return !state.bindings[step.elementId] && !state.variableMappings[step.elementId];
+  }
+  if (step.kind === 'OUTBOUND_COMMUNICATION') {
+    return !state.outboundConfigs[step.elementId] && !state.bindings[step.elementId];
+  }
+  if (step.kind === 'GATEWAY') {
+    return !(state.gatewayBranches || [])
+      .filter((branch) => branch.gatewayId === step.elementId)
+      .some((branch) => state.flowConditions[branch.flowId]?.condition || state.flowConditions[branch.flowId]?.isDefault);
+  }
+  return false;
 }
 
 function validateOutboundWizardStep(step, issues) {
@@ -2182,7 +2721,7 @@ function capabilityScore(capability, text) {
 }
 
 function defaultWizardInboundConfig(step) {
-  const event = slugify(step.name).replace(/-/g, '_').toUpperCase();
+  const event = inboundEventNameForWait(step.name, step.elementId);
   return {
     channel: 'EMAIL',
     provider: 'GMS',
@@ -2191,8 +2730,8 @@ function defaultWizardInboundConfig(step) {
     bpmnElementId: step.elementId,
     externalEvent: event,
     camundaMessage: event,
-    correlationField: 'requestId',
-    correlationExpression: '${requestId}',
+    correlationField: 'correlationId',
+    correlationExpression: '${correlationId}',
     variableMappings: defaultVariableMappings(downstreamRequiredProcessVariables(step.elementId))
   };
 }
@@ -2220,6 +2759,7 @@ function applyDeterministicMappingDefaults(elementId, capability) {
 }
 
 function bindWizardContentEvents() {
+  // configuration changed -> recalculate derived configuration -> validate current state -> replace validation result -> update UI
   document.querySelectorAll('button[data-wizard-step-index]').forEach((button) => {
     button.addEventListener('click', () => {
       state.wizardSession.currentStep = Number(button.dataset.wizardStepIndex);
@@ -2413,7 +2953,7 @@ function renderTechnicalDetails(step) {
 
 function renderWizardIssues(issues) {
   if (!issues.length) {
-    return '<div class="wizard-message info">OK: Esta etapa está configurada corretamente.</div>';
+    return '';
   }
   return issues.map((issue) => `<div class="wizard-message ${issue.level.toLowerCase()}">${escapeHtml(localizeIssueLevel(issue.level))}: ${escapeHtml(issue.message)}</div>`).join('');
 }
@@ -2501,13 +3041,13 @@ function renderInboundWizard(step) {
       <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="camundaMessage" value="${escapeAttribute(config.camundaMessage || '')}">
     </div>
     <div class="wizard-card">
-      <h3>Como o ADE reconhecerá a resposta correta?</h3>
+      <h3>Como reconhecer a instancia correta?</h3>
       <p>Durante a execução podem existir várias solicitações aguardando respostas. O sistema precisa de uma informação que permita descobrir a qual solicitação cada resposta pertence.</p>
       <label>Identificador da solicitação</label>
-      ${renderVariablePicker('correlationField', step.elementId, config.correlationField || 'requestId', context, 'String', 'data-wizard-inbound')}
-      <small>Termo técnico: Correlation Key</small>
+      ${renderVariablePicker('correlationField', step.elementId, config.correlationField || 'correlationId', context, 'String', 'data-wizard-inbound')}
+      <small>Expressao tecnica gerada pelo wizard</small>
       <label>Expressão técnica gerada</label>
-      <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationExpression" value="${escapeAttribute(config.correlationExpression || toExpression(config.correlationField || 'requestId'))}">
+      <input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="correlationExpression" value="${escapeAttribute(config.correlationExpression || toExpression(config.correlationField || 'correlationId'))}">
     </div>
     <div class="wizard-card">
       <h3>Quais dados ficarão disponíveis?</h3>
@@ -2670,7 +3210,7 @@ function validateInboundWizardStep(step, issues) {
   if (!config.externalEvent) issues.push({ level: 'ERROR', message: 'Informe o evento externo reconhecido pelo CIR.' });
   if (!config.camundaMessage) issues.push({ level: 'ERROR', message: 'Informe o nome da mensagem no processo.' });
   if (!config.correlationField) issues.push({ level: 'ERROR', message: 'Escolha o identificador usado para reconhecer a solicitação correta.' });
-  if (!config.correlationExpression) issues.push({ level: 'ERROR', message: 'Informe a expressão técnica de correlação.' });
+  if (!config.correlationExpression) config.correlationExpression = toExpression(config.correlationField || 'correlationId');
   if (config.variableMappings) {
     try {
       JSON.parse(config.variableMappings);
@@ -2719,17 +3259,36 @@ function addProducedVariablesForStep(variables, step) {
     if (!descriptor.name || variables.has(descriptor.name)) return;
     variables.set(descriptor.name, descriptor);
   };
-  const inbound = state.inboundConfigs[step.elementId]
+  let inbound = state.inboundConfigs[step.elementId]
     || (['START_MESSAGE_EVENT', 'INBOUND_EVENT'].includes(step.kind) ? defaultWizardInboundConfig(step) : null);
+  if (inbound && ['START_MESSAGE_EVENT', 'INBOUND_EVENT'].includes(step.kind)) {
+    inbound = normalizeGuidedInboundConfig(step, inbound);
+    state.inboundConfigs[step.elementId] = inbound;
+  }
   if (inbound) {
-    parseVariableMappings(inbound.variableMappings).forEach((mapping) => add({
-      name: mapping.name,
-      type: inferVariableType(mapping.name),
-      origin: step.name,
-      producerElement: step.elementId,
-      description: `Dado recebido em "${step.name}"`,
-      availability: 'AVAILABLE'
-    }));
+    if (inbound.correlationField) {
+      add({
+        name: inbound.correlationField,
+        type: 'String',
+        origin: step.name,
+        producerElement: step.elementId,
+        description: 'Identificador textual usado para correlacionar mensagens com a instancia correta.',
+        availability: 'AVAILABLE'
+      });
+    }
+    parseVariableMappings(inbound.variableMappings).forEach((mapping) => {
+      const field = inboundFieldForMapping(inbound, mapping);
+      add({
+        name: mapping.name,
+        type: field?.type || inferVariableType(mapping.name),
+        origin: step.name,
+        producerElement: step.elementId,
+        description: field
+          ? `${field.label} recebido em "${step.name}".`
+          : `Dado recebido em "${step.name}"`,
+        availability: 'AVAILABLE'
+      });
+    });
     if (inbound.correlationField) {
       add({
         name: inbound.correlationField,
@@ -2742,9 +3301,16 @@ function addProducedVariablesForStep(variables, step) {
     }
   }
   const capability = findCapability(state.bindings[step.elementId]);
-  const mappings = state.variableMappings[step.elementId] || {};
+  let mappings = state.variableMappings[step.elementId] || {};
+  if (capability && isAdvisorshipCheckCapability(capability)) {
+    ensureAdvisorshipCheckDefaults(step.elementId, { variables: Array.from(variables.values()) });
+    mappings = state.variableMappings[step.elementId] || {};
+  }
   if (capability && mappings.outputs) {
-    (capability.outputParameters || []).forEach((parameter) => {
+    const outputParameters = isAdvisorshipCheckCapability(capability)
+      ? advisorshipCheckOutputParameters()
+      : (capability.outputParameters || []);
+    outputParameters.forEach((parameter) => {
       const outputName = mappings.outputs[parameter.name];
       if (outputName) {
         add({
@@ -2935,9 +3501,20 @@ function bindWizardContentEvents() {
     input.addEventListener('change', () => {
       const elementId = input.dataset.wizardInbound;
       state.inboundConfigs[elementId] = state.inboundConfigs[elementId] || { bpmnElementId: elementId };
+      if (input.type === 'checkbox' && input.dataset.field === 'inboundField') {
+        toggleInboundField(elementId, input.value, input.checked);
+        saveProject();
+        renderRequirements();
+        renderWizard();
+        return;
+      }
       state.inboundConfigs[elementId][input.dataset.field] = input.dataset.field === 'correlationField'
         ? stripExpression(input.value)
         : input.value.trim();
+      state.inboundConfigs[elementId] = normalizeGuidedInboundConfig(
+        state.wizardSession.steps[state.wizardSession.currentStep],
+        state.inboundConfigs[elementId]
+      );
       if (input.dataset.field === 'correlationField') {
         state.inboundConfigs[elementId].correlationExpression = toExpression(input.value);
       }
@@ -2968,6 +3545,276 @@ function bindWizardContentEvents() {
   });
   document.querySelectorAll('button[data-view-code]').forEach((button) => {
     button.addEventListener('click', () => viewGeneratedCode(button.dataset.viewCode));
+  });
+}
+
+function renderInboundWizard(step) {
+  const config = normalizeGuidedInboundConfig(step, state.inboundConfigs[step.elementId] || defaultWizardInboundConfig(step));
+  state.inboundConfigs[step.elementId] = config;
+  const context = buildProcessDataContext(step.elementId);
+  const schema = inboundSchema(config.channel);
+  const selectedFields = selectedInboundFieldSources(config);
+  const messages = bpmnMessagesForWizard();
+  const messageForElement = bpmnMessageForElement(step.elementId);
+  const externalEvents = externalEventOptions(step);
+  const isStart = step.kind === 'START_MESSAGE_EVENT';
+  return `
+    <div class="wizard-card">
+      <h3>${isStart ? 'Configurando o recebimento da solicitacao' : 'Configurando a mensagem aguardada'}</h3>
+      <p>Selecione uma das fontes de entrada disponiveis para este ambiente.</p>
+      <label>Fonte da solicitacao</label>
+      <select data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="channel">
+        ${Object.values(INBOUND_DATA_SCHEMAS).map((item) => `<option value="${escapeAttribute(item.id)}" ${config.channel === item.id ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
+      </select>
+      <div class="wizard-message info">Evento externo: ocorrencia reconhecida pela infraestrutura. Mensagem BPMN: representacao dessa ocorrencia usada pelo Camunda/modelo.</div>
+      <label>Evento externo</label>
+      ${renderExternalEventDecision(step, config, externalEvents)}
+      <label>Mensagem BPMN</label>
+      ${renderBpmnMessageDecision(step, config, messages, messageForElement)}
+    </div>
+    ${isStart ? renderStartIdentifierPanel(config) : renderCatchCorrelationPanel(step, config, context)}
+    <div class="wizard-card">
+      <h3>Dados recebidos</h3>
+      <p>Escolha quais campos da entrada serao disponibilizados para o processo.</p>
+      ${renderInboundFieldSelector(step, schema, selectedFields)}
+      <h3>Dados produzidos</h3>
+      ${renderProcessDataContext(buildProducedDataContext(step))}
+      <h3>Dados disponiveis antes desta etapa</h3>
+      ${isStart ? '<p><small>Nao ha dados anteriores ao inicio do processo.</small></p>' : renderProcessDataContext(context)}
+    </div>`;
+}
+
+function normalizeGuidedInboundConfig(step, rawConfig) {
+  const schema = inboundSchema(rawConfig.channel || 'EMAIL');
+  const bpmnMessage = bpmnMessageForElement(step.elementId);
+  const inferredMessageName = bpmnMessage?.name || inboundEventNameForWait(step.name, step.elementId);
+  const messageName = shouldPreferBpmnMessage(step, rawConfig, bpmnMessage)
+    ? inferredMessageName
+    : rawConfig.camundaMessage || inferredMessageName;
+  const correlationField = step.kind === 'START_MESSAGE_EVENT'
+    ? 'correlationId'
+    : stripExpression(rawConfig.correlationField || 'correlationId');
+  const config = {
+    ...rawConfig,
+    createNewExternalEvent: rawConfig.createNewExternalEvent === true || rawConfig.createNewExternalEvent === 'true',
+    channel: schema.id,
+    provider: schema.provider,
+    router: schema.router,
+    action: step.kind === 'START_MESSAGE_EVENT' ? 'START_PROCESS' : 'CORRELATE_MESSAGE',
+    bpmnElementId: step.elementId,
+    externalEvent: shouldPreferBpmnMessage(step, rawConfig, bpmnMessage)
+      ? messageName
+      : rawConfig.externalEvent || messageName,
+    camundaMessage: messageName,
+    correlationField,
+    correlationExpression: toExpression(correlationField),
+    variableMappings: rawConfig.variableMappings || defaultGuidedVariableMappings(schema, step)
+  };
+  if (!selectedInboundFieldSources(config).length) {
+    config.variableMappings = defaultGuidedVariableMappings(schema, step);
+  }
+  config.variableMappings = mergeRequiredInboundMappings(config, schema, step);
+  return config;
+}
+
+function shouldPreferBpmnMessage(step, config, bpmnMessage) {
+  if (!bpmnMessage?.name) {
+    return false;
+  }
+  const inferredFromLabel = normalizeEventName(step.name || step.elementId);
+  return !config.camundaMessage
+    || config.camundaMessage === inferredFromLabel
+    || config.externalEvent === inferredFromLabel
+    || String(config.camundaMessage || '').startsWith('AGUARDAR_')
+    || String(config.externalEvent || '').startsWith('AGUARDAR_');
+}
+
+function inboundSchema(channel) {
+  return INBOUND_DATA_SCHEMAS[channel] || INBOUND_DATA_SCHEMAS.EMAIL;
+}
+
+function defaultGuidedVariableMappings(schema, step) {
+  const defaults = step.kind === 'START_MESSAGE_EVENT'
+    ? ['from', 'subject', 'body', 'messageId', 'hasAttachments', 'studentName', 'advisorName', 'studentEmail', 'advisorEmail', 'title', 'researchArea']
+    : ['from', 'subject', 'body', 'messageId'];
+  const mappings = {};
+  schema.fields
+    .filter((field) => defaults.includes(field.source))
+    .forEach((field) => {
+      mappings[field.variable] = field.expression;
+    });
+  mappings.correlationId = '${correlationId}';
+  return JSON.stringify(mappings, null, 2);
+}
+
+function mergeRequiredInboundMappings(config, schema, step) {
+  const mappings = Object.fromEntries(parseVariableMappings(config.variableMappings).map((mapping) => [mapping.name, mapping.expression]));
+  if (config.correlationField) {
+    mappings[config.correlationField] = toExpression(config.correlationField);
+  }
+  return JSON.stringify(mappings, null, 2);
+}
+
+function selectedInboundFieldSources(config) {
+  const mappings = parseVariableMappings(config.variableMappings);
+  const expressions = new Set(mappings.map((mapping) => mapping.expression));
+  return inboundSchema(config.channel).fields
+    .filter((field) => expressions.has(field.expression))
+    .map((field) => field.source);
+}
+
+function inboundFieldForMapping(config, mapping) {
+  return inboundSchema(config.channel).fields
+    .find((field) => field.expression === mapping.expression || field.variable === mapping.name);
+}
+
+function toggleInboundField(elementId, source, checked) {
+  const config = state.inboundConfigs[elementId] || {};
+  const schema = inboundSchema(config.channel);
+  const field = schema.fields.find((item) => item.source === source);
+  if (!field) return;
+  const mappings = Object.fromEntries(parseVariableMappings(config.variableMappings).map((mapping) => [mapping.name, mapping.expression]));
+  if (checked) {
+    mappings[field.variable] = field.expression;
+  } else {
+    delete mappings[field.variable];
+  }
+  if (config.correlationField) {
+    mappings[config.correlationField] = toExpression(config.correlationField);
+  }
+  config.variableMappings = JSON.stringify(mappings, null, 2);
+}
+
+function renderInboundFieldSelector(step, schema, selectedFields) {
+  return `<div class="wizard-field-list">${schema.fields.map((field) => {
+    const checked = selectedFields.includes(field.source);
+    const note = field.origin === 'CIR labeled field'
+      ? 'Lido pelo CIR do assunto/corpo quando a mensagem contem um rotulo reconhecido; a validacao consulta o PPG Management.'
+      : field.source === 'hasAttachments'
+      ? 'Indicador disponivel; a lista de anexos ainda nao existe no contrato GMS/CIR.'
+      : field.expression;
+    return `
+      <label class="wizard-field-row">
+        <input type="checkbox" data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="inboundField" value="${escapeAttribute(field.source)}" ${checked ? 'checked' : ''}>
+        <span>${escapeHtml(field.label)}</span>
+        <small>${escapeHtml(field.type)}</small>
+        <span><strong>${escapeHtml(field.variable)}</strong><br><small>${escapeHtml(note)}</small></span>
+      </label>`;
+  }).join('')}</div>`;
+}
+
+function renderExternalEventDecision(step, config, events) {
+  const existing = events.includes(config.externalEvent) || !config.createNewExternalEvent;
+  return `
+    <div class="wizard-choice">
+      <div>
+        <select data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="createNewExternalEvent">
+          <option value="" ${existing ? 'selected' : ''}>Usar evento existente</option>
+          <option value="true" ${config.createNewExternalEvent ? 'selected' : ''}>Criar novo tipo de evento</option>
+        </select>
+      </div>
+      <div style="grid-column: span 2;">
+        ${existing && events.length
+          ? `<select data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="externalEvent">${events.map((event) => `<option value="${escapeAttribute(event)}" ${config.externalEvent === event ? 'selected' : ''}>${escapeHtml(event)}</option>`).join('')}</select>`
+          : `<input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="externalEvent" value="${escapeAttribute(config.externalEvent || '')}" placeholder="NOVO_EVENTO">`}
+      </div>
+    </div>
+    <small>${config.createNewExternalEvent ? 'O novo evento sera registrado na configuracao de rotas publicada pelo ADE.' : 'Eventos existentes foram descobertos nas rotas CIR/ADE disponiveis.'}</small>`;
+}
+
+function renderBpmnMessageDecision(step, config, messages, messageForElement) {
+  const value = config.camundaMessage || messageForElement?.name || '';
+  if (messageForElement) {
+    return `<select data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="camundaMessage">
+      ${messages.map((message) => `<option value="${escapeAttribute(message.name)}" ${value === message.name ? 'selected' : ''}>${escapeHtml(message.name)} (${escapeHtml(message.id)})</option>`).join('')}
+    </select>
+    <small>O elemento BPMN ja referencia ${escapeHtml(messageForElement.id)}; o wizard reutiliza esta mensagem.</small>`;
+  }
+  return `<input data-wizard-inbound="${escapeAttribute(step.elementId)}" data-field="camundaMessage" value="${escapeAttribute(value)}" placeholder="NOME_DA_MENSAGEM">`;
+}
+
+function renderStartIdentifierPanel(config) {
+  return `
+    <div class="wizard-card">
+      <h3>Identificador da solicitacao</h3>
+      <p>Identificador da solicitacao: correlationId - sera criado automaticamente pelo CIR quando a solicitacao inicial nao trouxer um identificador.</p>
+      <p>Ele fica disponivel para respostas futuras, mas este evento inicial nao localiza uma instancia existente; ele cria uma nova instancia.</p>
+      <small>Expressao tecnica gerada: ${escapeHtml(config.correlationExpression || '${correlationId}')}</small>
+    </div>`;
+}
+
+function renderCatchCorrelationPanel(step, config, context) {
+  return `
+    <div class="wizard-card">
+      <h3>Como reconhecer a instancia correta?</h3>
+      <p>Neste ponto ja existe uma instancia aguardando. O CIR precisa identificar qual instancia recebera a resposta.</p>
+      <label>Identificador recebido na resposta</label>
+      ${renderVariablePicker('correlationField', step.elementId, config.correlationField || 'correlationId', context, 'String', 'data-wizard-inbound')}
+      <div class="wizard-message info">${escapeHtml(config.correlationField || 'correlationId')} -> mensagem enviada -> resposta -> CIR -> instancia correta.</div>
+      <small>Expressao tecnica gerada: ${escapeHtml(config.correlationExpression || toExpression(config.correlationField || 'correlationId'))}</small>
+    </div>`;
+}
+
+function bpmnMessagesForWizard() {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlBox.value || '', 'text/xml');
+  return Array.from(doc.getElementsByTagName('*'))
+    .filter((node) => node.localName === 'message')
+    .map((node) => ({ id: node.getAttribute('id') || '', name: node.getAttribute('name') || '' }))
+    .filter((message) => message.id || message.name);
+}
+
+function bpmnMessageForElement(elementId) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlBox.value || '', 'text/xml');
+  const node = doc.querySelector(`[id="${elementId}"]`);
+  const definition = node ? Array.from(node.childNodes).find((child) => child.nodeType === Node.ELEMENT_NODE && child.localName === 'messageEventDefinition') : null;
+  const ref = definition?.getAttribute('messageRef') || '';
+  return bpmnMessagesForWizard().find((message) => message.id === ref) || null;
+}
+
+function externalEventOptions(step) {
+  const routeEvents = ['VINCULACAO_SOLICITADA', 'DADOS_COMPLEMENTARES', 'CONFIRMACAO_ESTUDANTE', 'CONFIRMACAO_COORDENADOR'];
+  const configured = Object.values(state.inboundConfigs || {}).map((config) => config.externalEvent).filter(Boolean);
+  const bpmn = bpmnMessagesForWizard().map((message) => message.name).filter(Boolean);
+  return Array.from(new Set([...routeEvents, ...configured, ...bpmn, inboundEventNameForWait(step.name, step.elementId)])).filter(Boolean);
+}
+
+function validateCapabilityAndMappings(step, issues) {
+  const capability = findCapability(state.bindings[step.elementId]);
+  if (!capability) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: nenhuma funcionalidade foi escolhida. Por que: esta tarefa precisa de uma capability/worker para executar. Como corrigir: selecione uma funcionalidade compativel.' });
+    return;
+  }
+  const context = buildProcessDataContext(step.elementId);
+  const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
+  (capability.inputParameters || []).forEach((parameter) => {
+    const value = ((mappings.inputs || {})[parameter.name] || '').trim();
+    const expectedType = normalizeCapabilityType(parameter.type);
+    if (!value) {
+      const available = sortedVariablesForType(context.variables, expectedType);
+      issues.push({
+        level: 'ERROR',
+        message: available.length
+          ? `O que esta errado: ${parameter.name} (${expectedType}) ainda nao foi associado. Por que: a capability precisa desse dado. Como corrigir: escolha um dos dados compativeis listados.`
+          : `O que esta errado: a capability precisa de ${parameter.name} (${expectedType}), mas nenhum dado desse tipo esta disponivel. Por que: mapping nao transforma dados; ele apenas associa dados existentes. Como corrigir: revise uma etapa anterior ou adicione uma capability de extracao/identificacao antes desta tarefa.`
+      });
+      return;
+    }
+    const variableName = stripExpression(value);
+    const variable = context.variables.find((item) => item.name === variableName);
+    if (!variable) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${variableName} nao existe neste ponto do processo. Por que: dados produzidos depois desta tarefa ainda nao podem ser usados. Como corrigir: escolha um dado disponivel antes desta tarefa.` });
+      return;
+    }
+    if (!isCompatibleVariableType(variable.type, expectedType)) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${variable.name} (${variable.type}) nao e compativel com ${parameter.name} (${expectedType}). Por que: mapping nao faz transformacao/extracao. Como corrigir: use um dado ${expectedType} existente ou crie uma etapa anterior que produza esse dado.` });
+    }
+  });
+  (capability.outputParameters || []).forEach((parameter) => {
+    if (!((mappings.outputs || {})[parameter.name] || '').trim()) {
+      issues.push({ level: 'WARNING', message: `O que esta errado: o resultado ${parameter.name} nao sera salvo. Por que: etapas posteriores nao poderao usa-lo. Como corrigir: informe o nome do dado de processo produzido.` });
+    }
   });
 }
 
@@ -3157,11 +4004,24 @@ function renderExecutionSummary(step) {
 }
 
 function sortedVariablesForType(variables, preferredType) {
-  return [...variables].sort((left, right) => {
+  const filtered = preferredType
+    ? variables.filter((variable) => isCompatibleVariableType(variable.type, preferredType))
+    : variables;
+  return [...filtered].sort((left, right) => {
     const leftType = preferredType && left.type === preferredType ? 0 : 1;
     const rightType = preferredType && right.type === preferredType ? 0 : 1;
     return leftType - rightType || variablePrioritySort(left, right);
   });
+}
+
+function isCompatibleVariableType(actualType, expectedType) {
+  const actual = normalizeCapabilityType(actualType);
+  const expected = normalizeCapabilityType(expectedType);
+  if (!expected) return true;
+  if (actual === expected) return true;
+  if (expected === 'Number' && ['Long', 'Integer', 'Number'].includes(actual)) return true;
+  if (['Long', 'Integer'].includes(expected) && actual === expected) return true;
+  return false;
 }
 
 function variablePrioritySort(left, right) {
@@ -3171,6 +4031,7 @@ function variablePrioritySort(left, right) {
 
 function normalizeCapabilityType(type) {
   if (!type) return 'String';
+  if (type.includes('Array')) return type;
   if (['Long', 'Integer', 'Double', 'Float', 'BigDecimal'].includes(type)) return type === 'Long' || type === 'Integer' ? type : 'Number';
   if (type.includes('Boolean')) return 'Boolean';
   if (type.includes('File')) return 'File';
@@ -3179,6 +4040,7 @@ function normalizeCapabilityType(type) {
 
 function inferVariableType(name) {
   const lower = normalizeSearchText(name);
+  if (lower.includes('correlation') || lower.includes('request')) return 'String';
   if (lower.startsWith('is') || lower.includes('valid') || lower.includes('complete') || lower.includes('completo') || lower.includes('aprovado')) return 'Boolean';
   if (lower.endsWith('id') || lower.includes('count') || lower.includes('quantidade')) return 'Long';
   if (lower.includes('file')) return 'File';
@@ -3223,6 +4085,170 @@ function findNextGatewayName(elementId) {
 function toCamelCase(value) {
   const parts = slugify(value).split('-').filter(Boolean);
   return parts.map((part, index) => index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)).join('');
+}
+
+function renderTutorialIntro(step) {
+  if (step.kind === 'START_MESSAGE_EVENT') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao do inicio do processo - ${escapeHtml(step.name)}</h3>
+        <p>Para uma nova execucao do processo iniciar, este evento deve ser identificado pelo sistema de automacao.</p>
+        <p>Para configurar essa captura e preciso: <strong>I.</strong> Associar o evento a um canal e a um tipo de entrada. <strong>II.</strong> Definir quais dados recebidos com o evento serao disponibilizados para utilizacao pelo processo.</p>
+      </div>`;
+  }
+  if (step.kind === 'SERVICE_TASK') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da tarefa "${escapeHtml(step.name)}"</h3>
+        <p>Esta tarefa sera executada por uma funcionalidade do ambiente. O wizard mostra o que a funcionalidade faz, quais dados ela precisa receber e quais resultados entregara ao processo.</p>
+      </div>`;
+  }
+  if (step.kind === 'OUTBOUND_COMMUNICATION') {
+    return `
+      <div class="wizard-card">
+        <h3>Envio de mensagem - ${escapeHtml(step.name)}</h3>
+        <p>Defina a intencao do envio: para quem enviar, qual assunto, qual mensagem e se um identificador precisa acompanhar a resposta futura.</p>
+      </div>`;
+  }
+  if (step.kind === 'INBOUND_EVENT') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da espera por mensagem - ${escapeHtml(step.name)}</h3>
+        <p>Neste ponto o processo ja existe e ficara aguardando uma mensagem. A correlacao pertence aqui: o CIR precisa reconhecer qual instancia recebera a resposta.</p>
+      </div>`;
+  }
+  if (step.kind === 'GATEWAY') {
+    return `
+      <div class="wizard-card">
+        <h3>Configuracao da decisao "${escapeHtml(step.name)}"</h3>
+        <p>Este ponto decide qual caminho o processo seguira. Escolha um dado produzido anteriormente e defina quando cada caminho deve ser utilizado.</p>
+        ${renderPreviousProducerHint(step)}
+      </div>`;
+  }
+  return `
+    <div class="wizard-card">
+      <h3>Revisao do elemento "${escapeHtml(step.name)}"</h3>
+      <p>Este elemento participa do processo e sera validado para garantir que possui informacoes suficientes.</p>
+    </div>`;
+}
+
+function renderServiceTaskWizard(step) {
+  const capabilityId = state.bindings[step.elementId] || '';
+  const capability = findCapability(capabilityId);
+  const suggestion = suggestCapability(step);
+  const context = buildProcessDataContext(step.elementId);
+  const legacyNotice = legacyCapabilityNotice(step);
+  return `
+    <div class="wizard-card">
+      <h3>O que esta tarefa deve fazer?</h3>
+      <p>Escolha a funcionalidade de negocio que executara esta etapa. A lista prioriza capabilities compativeis com o nome da tarefa e os contratos registrados.</p>
+      ${suggestion ? `<div class="wizard-message info">Sugestao deterministica: ${escapeHtml(suggestion.id)} - ${escapeHtml(suggestion.name)}</div>` : ''}
+      ${legacyNotice}
+      ${renderWizardCapabilityPicker(step, capabilityId)}
+    </div>
+    <div class="wizard-card">
+      <h3>Dados disponiveis antes desta tarefa</h3>
+      ${renderProcessDataContext(context)}
+    </div>
+    ${capability ? `
+      <div class="wizard-card">
+        <h3>${escapeHtml(capability.name)}</h3>
+        <p>${escapeHtml(capability.description || '')}</p>
+        <div class="wizard-grid">
+          <div><strong>O que esta funcionalidade faz?</strong><p>${escapeHtml(capability.description || '')}</p></div>
+          <div><strong>Quem executa?</strong><p>${escapeHtml(capability.provider || '')}</p></div>
+        </div>
+        ${renderCapabilityNeedReturn(capability)}
+        ${renderCapabilityMappingEditor(step.elementId, capability, context)}
+        ${renderCapabilityOutputContextNotice(step, capability)}
+        ${renderRequirementImplementation(step.elementId, capability)}
+      </div>` : ''}`;
+}
+
+function renderOutboundWizard(step) {
+  if (!state.bindings[step.elementId]) {
+    state.bindings[step.elementId] = 'SEND_EMAIL';
+  }
+  const capability = findCapability(state.bindings[step.elementId]);
+  const context = buildProcessDataContext(step.elementId);
+  const needsReplyToken = nextWaitingMessageAfter(step.elementId);
+  const config = normalizeOutboundConfig(step, state.outboundConfigs[step.elementId] || {}, needsReplyToken);
+  state.outboundConfigs[step.elementId] = config;
+  return `
+    <div class="wizard-card">
+      <h3>Intencao do envio</h3>
+      <p>Nesta distribuicao, o envio usa a capability SEND_EMAIL por worker de automacao. O wizard gera os parametros tecnicos a partir da mensagem definida aqui.</p>
+      ${renderWizardCapabilityPicker(step, state.bindings[step.elementId])}
+    </div>
+    <div class="wizard-card">
+      <h3>Mensagem</h3>
+      <label>Para quem enviar?</label>
+      ${renderValueSourcePicker('emailTo', step.elementId, config.emailTo || '', context, 'String', 'data-wizard-outbound')}
+      <label>Qual assunto?</label>
+      <input data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="emailSubject" value="${escapeAttribute(config.emailSubject || suggestedOutboundSubject(step, config, needsReplyToken))}">
+      <label>Qual mensagem?</label>
+      <textarea data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="emailBody">${escapeHtml(config.emailBody || '')}</textarea>
+      <label>E necessario incluir identificador para futura resposta?</label>
+      <select data-wizard-outbound="${escapeAttribute(step.elementId)}" data-field="includeCorrelationId">
+        <option value="true" ${config.includeCorrelationId !== 'false' && needsReplyToken ? 'selected' : ''}>Sim</option>
+        <option value="false" ${config.includeCorrelationId === 'false' || !needsReplyToken ? 'selected' : ''}>Nao</option>
+      </select>
+      ${needsReplyToken ? '<div class="wizard-message warning">Ha uma etapa posterior aguardando resposta. A mensagem precisa permitir recuperar correlationId; inclua ${correlationId} no assunto ou no corpo.</div>' : ''}
+      <label>Documento ou link a incluir</label>
+      ${renderValueSourcePicker('attachmentOrLink', step.elementId, config.attachmentOrLink || '', context, 'String', 'data-wizard-outbound')}
+    </div>
+    <div class="wizard-card">
+      <h3>Dados disponiveis para este e-mail</h3>
+      ${renderProcessDataContext(context)}
+    </div>
+    ${capability ? `<div class="wizard-card">${renderCapabilityNeedReturn(capability)}${renderCapabilityMappingEditor(step.elementId, capability, context)}</div>` : ''}`;
+}
+
+function renderWizardIssues(issues) {
+  if (!issues.length) {
+    return '';
+  }
+  return issues.map((issue) => `<div class="wizard-message ${issue.level.toLowerCase()}">${escapeHtml(localizeIssueLevel(issue.level))}: ${escapeHtml(issue.message)}</div>`).join('');
+}
+
+function renderExecutionSummary(step) {
+  if (step.kind === 'START_MESSAGE_EVENT') {
+    const config = state.inboundConfigs[step.elementId] || {};
+    const processName = document.getElementById('projectName').value || 'processo';
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ol>
+          <li>GMS recebe o e-mail.</li>
+          <li>CIR identifica o tipo ${escapeHtml(config.externalEvent || '')}.</li>
+          <li>O evento inicia nova instancia de ${escapeHtml(processName)}.</li>
+          <li>Os campos selecionados sao convertidos em dados do processo.</li>
+          <li>O identificador ${escapeHtml(config.correlationField || 'correlationId')} fica disponivel para correlacoes futuras.</li>
+        </ol>
+      </div>`;
+  }
+  if (step.kind === 'SERVICE_TASK') {
+    const capability = findCapability(state.bindings[step.elementId]);
+    const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ol>
+          <li>O worker le os dados de entrada selecionados no contexto do processo.</li>
+          <li>${escapeHtml(capability?.name || 'A funcionalidade escolhida')} executa a acao configurada.</li>
+          <li>${renderOutputSummaryText(capability, mappings)}</li>
+        </ol>
+      </div>`;
+  }
+  if (step.kind === 'GATEWAY') {
+    const branches = (state.gatewayBranches || []).filter((branch) => branch.gatewayId === step.elementId);
+    return `
+      <div class="wizard-card">
+        <h3>Resumo</h3>
+        <ul>${branches.map((branch) => `<li>${escapeHtml(readableFlowCondition(branch))} - ${escapeHtml(branch.flowName || branch.targetName || branch.flowId)}</li>`).join('')}</ul>
+      </div>`;
+  }
+  return '';
 }
 
 async function applyCapabilityToBpmnElement(elementId, capabilityId) {
@@ -3312,7 +4338,8 @@ function validateProject() {
     .filter((item) => item.type.includes('INBOUND_EVENT'))
     .forEach((item) => {
       const config = state.inboundConfigs[item.elementId] || item.inboundConfig;
-      if (!config || !config.externalEvent || !config.camundaMessage || !config.correlationField || !config.correlationExpression) {
+      const derivedCorrelationExpression = config?.correlationExpression || toExpression(config?.correlationField || 'correlationId');
+      if (!config || !config.externalEvent || !config.camundaMessage || !config.correlationField || !derivedCorrelationExpression) {
         errors.push(`Inbound/correlation configuration missing: ${item.name}`);
       }
       if (config && config.variableMappings) {
@@ -3577,8 +4604,8 @@ async function deploy() {
       projectKey: document.getElementById('projectKey').value,
       version: document.getElementById('projectVersion').value,
       bpmnXml: xmlBox.value,
-      integration: state.integration,
-      inboundIntegrations: Object.values(state.inboundConfigs)
+      integration: currentStartIntegration(),
+      inboundIntegrations: Object.values(state.inboundConfigs).filter((config) => config.action !== 'START_PROCESS')
     };
 
     renderDeploymentProgress(progress, 'Enviando requisicao para /api/deployments');
@@ -4070,5 +5097,230 @@ document.addEventListener('keydown', (event) => {
     cancelWizard();
   }
 });
+
+function isAdvisorshipCheckCapability(capability) {
+  return capability?.id === 'CHECK_ADVISORSHIP' || capability?.id === 'VALIDATE_ADVISORSHIP_REQUEST';
+}
+
+function identityCandidateNames(prefix) {
+  return [`${prefix}Id`, `${prefix}Email`, `${prefix}Name`];
+}
+
+function firstAvailableIdentity(context, prefix) {
+  return identityCandidateNames(prefix)
+    .map((name) => context.variables.find((variable) => variable.name === name))
+    .find(Boolean);
+}
+
+function ensureAdvisorshipCheckDefaults(elementId, context) {
+  state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+  const mappings = state.variableMappings[elementId];
+  mappings.inputs = mappings.inputs || {};
+  mappings.outputs = mappings.outputs || {};
+  const student = firstAvailableIdentity(context, 'student');
+  const advisor = firstAvailableIdentity(context, 'advisor');
+  if (!stripExpression(mappings.inputs.studentIdentity) && student) {
+    mappings.inputs.studentIdentity = toExpression(student.name);
+  }
+  if (!stripExpression(mappings.inputs.advisorIdentity) && advisor) {
+    mappings.inputs.advisorIdentity = toExpression(advisor.name);
+  }
+  ['title', 'researchArea'].forEach((name) => {
+    if (!stripExpression(mappings.inputs[name]) && context.variables.some((variable) => variable.name === name)) {
+      mappings.inputs[name] = toExpression(name);
+    }
+  });
+  advisorshipCheckOutputParameters().forEach((parameter) => {
+    mappings.outputs[parameter.name] = mappings.outputs[parameter.name] || parameter.name;
+  });
+}
+
+function advisorshipCheckOutputParameters() {
+  return [
+    { name: 'complete', type: 'Boolean' },
+    { name: 'dadosCompletos', type: 'Boolean' },
+    { name: 'valid', type: 'Boolean' },
+    { name: 'reason', type: 'String' },
+    { name: 'missingFields', type: 'String' },
+    { name: 'studentId', type: 'Long' },
+    { name: 'studentName', type: 'String' },
+    { name: 'studentEmail', type: 'String' },
+    { name: 'advisorId', type: 'Long' },
+    { name: 'advisorName', type: 'String' },
+    { name: 'advisorEmail', type: 'String' },
+    { name: 'programName', type: 'String' },
+    { name: 'institution', type: 'String' },
+    { name: 'campus', type: 'String' },
+    { name: 'coordinatorName', type: 'String' },
+    { name: 'coordinatorEmail', type: 'String' }
+  ];
+}
+
+function renderCapabilityMappingEditor(elementId, capability, context = buildProcessDataContext(elementId)) {
+  if (isAdvisorshipCheckCapability(capability)) {
+    ensureAdvisorshipCheckDefaults(elementId, context);
+    return renderAdvisorshipCheckMappingEditor(elementId, capability, context);
+  }
+  return `
+    <h3>Como os dados serao usados?</h3>
+    <div>
+      ${(capability.inputParameters || []).map((parameter) => renderTutorialInputMapping(elementId, parameter, context)).join('')}
+      <h3>Quais resultados voce deseja disponibilizar para as proximas etapas?</h3>
+      ${(capability.outputParameters || []).map((parameter) => renderTutorialOutputMapping(elementId, parameter)).join('')}
+    </div>`;
+}
+
+function renderAdvisorshipCheckMappingEditor(elementId, capability, context) {
+  const mappings = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+  return `
+    <h3>Como a solicitacao sera identificada?</h3>
+    <p>A capability recebe dados da solicitacao e consulta o PPG Management. Ela tenta resolver estudante e orientador por ID quando houver; se nao houver ID, usa nome ou e-mail para obter os identificadores.</p>
+    ${renderIdentitySourcePicker(elementId, 'studentIdentity', 'Estudante', context, mappings.inputs?.studentIdentity || '', 'student')}
+    ${renderIdentitySourcePicker(elementId, 'advisorIdentity', 'Orientador', context, mappings.inputs?.advisorIdentity || '', 'advisor')}
+    <h3>Dados da solicitacao verificados pela capability</h3>
+    ${renderNamedSourcePicker(elementId, 'title', 'Titulo do trabalho', context, mappings.inputs?.title || '', 'String')}
+    ${renderNamedSourcePicker(elementId, 'researchArea', 'Area de pesquisa', context, mappings.inputs?.researchArea || '', 'String')}
+    <h3>Resultados disponibilizados para as proximas etapas</h3>
+    ${advisorshipCheckOutputParameters().map((parameter) => renderTutorialOutputMapping(elementId, parameter)).join('')}
+    <div class="wizard-message info">Quando a consulta encontra uma unica pessoa compativel no PPG Management, o worker grava os IDs, e-mails, dados do programa e coordenador no processo junto com dadosCompletos.</div>`;
+}
+
+function renderIdentitySourcePicker(elementId, field, label, context, value, prefix) {
+  const selected = stripExpression(value);
+  const options = identityCandidateNames(prefix)
+    .map((name) => context.variables.find((variable) => variable.name === name))
+    .filter(Boolean);
+  const error = options.length ? '' : `<div class="wizard-message error">${label}: nenhum ID, e-mail ou nome esta disponivel antes desta tarefa. Configure a etapa inicial para capturar um desses dados.</div>`;
+  return `
+    <div class="wizard-mapping-row">
+      <span>${escapeHtml(label)}</span>
+      <span>&lt;-</span>
+      <select data-wizard-mapping-input="${escapeAttribute(elementId)}" data-field="${escapeAttribute(field)}">
+        <option value="">Selecionar dado</option>
+        ${options.map((variable) => `<option value="${escapeAttribute(variable.name)}" ${selected === variable.name ? 'selected' : ''}>${escapeHtml(variable.name)} (${escapeHtml(variable.type)}) - ${escapeHtml(variable.origin)}</option>`).join('')}
+      </select>
+    </div>
+    ${error}`;
+}
+
+function renderNamedSourcePicker(elementId, field, label, context, value, preferredType) {
+  const selected = stripExpression(value);
+  const options = sortedVariablesForType(context.variables, preferredType);
+  return `
+    <div class="wizard-mapping-row">
+      <span>${escapeHtml(label)}</span>
+      <span>&lt;-</span>
+      <select data-wizard-mapping-input="${escapeAttribute(elementId)}" data-field="${escapeAttribute(field)}">
+        <option value="">Selecionar dado</option>
+        ${options.map((variable) => `<option value="${escapeAttribute(variable.name)}" ${selected === variable.name ? 'selected' : ''}>${escapeHtml(variable.name)} (${escapeHtml(variable.type)}) - ${escapeHtml(variable.origin)}</option>`).join('')}
+      </select>
+    </div>`;
+}
+
+function applyDeterministicMappingDefaults(elementId, capability) {
+  if (!capability) return;
+  state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+  if (isAdvisorshipCheckCapability(capability)) {
+    ensureAdvisorshipCheckDefaults(elementId, buildProcessDataContext(elementId));
+    return;
+  }
+  (capability.inputParameters || []).forEach((parameter) => {
+    state.variableMappings[elementId].inputs[parameter.name] = state.variableMappings[elementId].inputs[parameter.name] || '${' + parameter.name + '}';
+  });
+  (capability.outputParameters || []).forEach((parameter) => {
+    state.variableMappings[elementId].outputs[parameter.name] = state.variableMappings[elementId].outputs[parameter.name] || defaultOutputVariableName(elementId, parameter);
+  });
+}
+
+function validateCapabilityAndMappings(step, issues) {
+  const capability = findCapability(state.bindings[step.elementId]);
+  if (!capability) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: nenhuma funcionalidade foi escolhida. Por que: esta tarefa precisa de uma capability/worker para executar. Como corrigir: selecione uma funcionalidade compativel.' });
+    return;
+  }
+  const context = buildProcessDataContext(step.elementId);
+  if (isAdvisorshipCheckCapability(capability)) {
+    ensureAdvisorshipCheckDefaults(step.elementId, context);
+    validateAdvisorshipCheckMappings(step, context, issues);
+    return;
+  }
+  const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
+  (capability.inputParameters || []).forEach((parameter) => {
+    const value = ((mappings.inputs || {})[parameter.name] || '').trim();
+    const expectedType = normalizeCapabilityType(parameter.type);
+    if (!value) {
+      const available = sortedVariablesForType(context.variables, expectedType);
+      issues.push({
+        level: 'ERROR',
+        message: available.length
+          ? `O que esta errado: ${parameter.name} (${expectedType}) ainda nao foi associado. Por que: a capability precisa desse dado. Como corrigir: escolha um dos dados compativeis listados.`
+          : `O que esta errado: a capability precisa de ${parameter.name} (${expectedType}), mas nenhum dado desse tipo esta disponivel. Por que: mapping nao transforma dados; ele apenas associa dados existentes. Como corrigir: revise uma etapa anterior ou adicione uma capability de extracao/identificacao antes desta tarefa.`
+      });
+      return;
+    }
+    const variableName = stripExpression(value);
+    const variable = context.variables.find((item) => item.name === variableName);
+    if (!variable) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${variableName} nao existe neste ponto do processo. Por que: dados produzidos depois desta tarefa ainda nao podem ser usados. Como corrigir: escolha um dado disponivel antes desta tarefa.` });
+      return;
+    }
+    if (!isCompatibleVariableType(variable.type, expectedType)) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${variable.name} (${variable.type}) nao e compativel com ${parameter.name} (${expectedType}). Por que: mapping nao faz transformacao/extracao. Como corrigir: use um dado ${expectedType} existente ou crie uma etapa anterior que produza esse dado.` });
+    }
+  });
+  (capability.outputParameters || []).forEach((parameter) => {
+    if (!((mappings.outputs || {})[parameter.name] || '').trim()) {
+      issues.push({ level: 'WARNING', message: `O que esta errado: o resultado ${parameter.name} nao sera salvo. Por que: etapas posteriores nao poderao usa-lo. Como corrigir: informe o nome do dado de processo produzido.` });
+    }
+  });
+}
+
+function validateAdvisorshipCheckMappings(step, context, issues) {
+  const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
+  [
+    { field: 'studentIdentity', label: 'estudante', names: identityCandidateNames('student') },
+    { field: 'advisorIdentity', label: 'orientador', names: identityCandidateNames('advisor') }
+  ].forEach((item) => {
+    const value = stripExpression((mappings.inputs || {})[item.field]);
+    const variable = context.variables.find((candidate) => candidate.name === value);
+    if (!variable || !item.names.includes(variable.name)) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: falta identificar o ${item.label}. Por que: a capability precisa consultar o PPG Management por ID, nome ou e-mail. Como corrigir: na etapa inicial, selecione ${item.names.join(', ')} ou escolha um desses dados aqui.` });
+    }
+  });
+  ['title', 'researchArea'].forEach((field) => {
+    const value = stripExpression((mappings.inputs || {})[field]);
+    if (!context.variables.some((variable) => variable.name === value && isCompatibleVariableType(variable.type, 'String'))) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: falta ${field}. Por que: o worker exige esse dado para verificar a solicitacao. Como corrigir: capture ${field} na etapa inicial.` });
+    }
+  });
+}
+
+function validateInboundWizardStep(step, issues) {
+  const config = normalizeGuidedInboundConfig(step, state.inboundConfigs[step.elementId] || defaultWizardInboundConfig(step));
+  state.inboundConfigs[step.elementId] = config;
+  if (!config.channel) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: a fonte de entrada nao foi escolhida. Por que: o wizard precisa saber qual infraestrutura recebera a ocorrencia. Como corrigir: selecione uma fonte disponivel.' });
+  }
+  if (!config.externalEvent) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: falta o evento externo. Por que: o CIR precisa reconhecer que tipo de ocorrencia chegou. Como corrigir: escolha um evento existente ou crie um novo tipo.' });
+  }
+  if (!config.camundaMessage) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: falta a mensagem BPMN. Por que: o Camunda precisa de um nome de mensagem presente no modelo. Como corrigir: selecione uma mensagem do BPMN ou informe uma nova.' });
+  }
+  if (step.kind !== 'START_MESSAGE_EVENT') {
+    const context = buildProcessDataContext(step.elementId);
+    const field = stripExpression(config.correlationField);
+    if (!field) {
+      issues.push({ level: 'ERROR', message: 'O que esta errado: falta o identificador de correlacao. Por que: ja existe uma instancia aguardando resposta. Como corrigir: selecione correlationId ou outro dado String disponivel.' });
+    } else if (!context.variables.some((variable) => variable.name === field && isCompatibleVariableType(variable.type, 'String'))) {
+      issues.push({ level: 'ERROR', message: `O que esta errado: ${field} nao esta disponivel como String antes desta espera. Por que: o CIR precisa correlacionar a resposta a uma instancia existente. Como corrigir: revise a etapa que deveria produzir esse identificador.` });
+    }
+  }
+  try {
+    JSON.parse(config.variableMappings || '{}');
+  } catch (error) {
+    issues.push({ level: 'ERROR', message: 'O que esta errado: os dados produzidos nao puderam ser gerados como JSON valido. Por que: essa configuracao tecnica sera enviada ao runtime. Como corrigir: altere a selecao de campos recebidos.' });
+  }
+}
 
 init();

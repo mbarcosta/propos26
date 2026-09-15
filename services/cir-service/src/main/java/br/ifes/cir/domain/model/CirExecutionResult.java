@@ -55,6 +55,8 @@ public class CirExecutionResult {
      */
     private List<ClassifiedMessage> identifiedEvents = new ArrayList<>();
 
+    private List<IgnoredMessage> ignoredMessages = new ArrayList<>();
+
     public String getBindingId() {
         return bindingId;
     }
@@ -85,5 +87,13 @@ public class CirExecutionResult {
 
     public void setIdentifiedEvents(List<ClassifiedMessage> identifiedEvents) {
         this.identifiedEvents = identifiedEvents;
+    }
+
+    public List<IgnoredMessage> getIgnoredMessages() {
+        return ignoredMessages;
+    }
+
+    public void setIgnoredMessages(List<IgnoredMessage> ignoredMessages) {
+        this.ignoredMessages = ignoredMessages;
     }
 }

@@ -1,0 +1,128 @@
+Ok, temos um wizard quase funcionando. Porem ele está longe de permitir a configuração facilitada da automação.
+
+Entao, vamos considerar o processo Vinculação de orientação e construir um wizard ideal para este processo.
+
+A primeira etapa
+
+Evento inicial
+Nota-se claramente que o COdex tentou dar explicabilidade a configuração e não tutorar a configuração,
+Vou comentar cada parte para vc entender claramente o que quero
+1. 
+Configuração do início do processo - Receber solicitacao
+Este processo começa quando uma solicitação externa é recebida. 
+Precisamos definir de onde ela chega, como será reconhecida e quais informações ficarão disponíveis para as próximas etapas.
+
+Meu comentário: Esta  parte da explicação pode mudar para: Para uma nova execução do processo iniciar esse evento deve ser identificado pelo Sistema Camunda. 
+Para configurar essa captura é preciso:
+I - Associar o evento a um canal de entrada e a um tipo de entrada.
+II - Configurar como os dados que virão com o evento serão armazenados para utilização no processo. 
+
+--------------------------------------
+OK: Esta etapa está configurada corretamente.
+
+Meu comentário: A indicação de que uma etapa está configurada pode ir para uma barra azul marinho no topo da janela de configuração e não no meio da configuração como está agora. 
+---------------------------------------------
+
+
+Como a solicitação chega?
+O GMS recebe a mensagem e o CIR reconhece o evento externo. Depois disso, o CIR inicia ou correlaciona a mensagem com uma instância do processo no Camunda.
+
+
+
+Meu comentário: Aqui está muito explicativo e não tutoral.  
+Mude para algo: Configurando  o recebimento  da solicitação
+
+- Selecione uma das opções de fonte disponíveis.  
+
+Canal de recebimento [listbox]
+E-mail
+---------------------------------------------------------------------------
+
+Qual evento externo representa esta mensagem?
+RECEBER_SOLICITACAO
+Nome da mensagem no processo
+RECEBER_SOLICITACAO
+
+meu comentário: aqui não entendo se posso criar um evento externo qualquer novo ou se gtenho de inserir um evento que já existe no CIR-GMS. Também náo sei a diferença entre evento externo e nome da mensagem do processo. Nem eu entendi isso. 
+Se o evento tiver  que bater com evento do CIR, então deverá ser listada a lista de eventos possíveis quando o canal for selecionado. Por exemplo, se selecionou email, vem do CIR-GMS. Logo devem ser listadas as opções de eventos disponíveis. Agora se puder criar um evento novo para configurar o CIR-GMS então isso deve ser informado no wizard. Informar assim: Como evento externo vc deve definir um nome unicamente identificável associado a [nome do objeto de captura no processo]
+Quanto a mensagem do processo é preciso dizer a mesma coisa sobre ela. O que deve ser inserido. Se ele deve ter valores predefinidos no modelo bpmn do processo então esses valões devem aparecer numa Listbox para serem selecionados. 
+
+
+---------------------------------------------------------------------------------
+
+Como o ADE reconhecerá a resposta correta?
+
+Durante a execução podem existir várias solicitações aguardando respostas. O sistema precisa de uma informação que permita descobrir a qual solicitação cada resposta pertence.
+
+Identificador da solicitação
+
+Selecionar dado do processo
+ Termo técnico: Correlation Key
+Expressão técnica gerada
+${requestId}
+
+
+meu comentário: Esta etapa está muito confusa e difícil de configurar.
+
+Até o momento o usuário sabe qe a mensagem chega por um canal e possui um tipo.
+Eu estou entendendo que o tipo da mensagem vai determinar se ela vai ser vinculada a uma instancia existente ou vai criar uma nova. 
+No caso de um evento de início, ainda náo existe correlação entre o evento e a instancia pois elá será criada ainda. Isso deve ser avisado na configuração do Evento de início. Aqui pelo que entendi o requesID é gerado.  Isso precisa ficar claro para o usuário. Identificador da solicitação tem esta opção : selecionar dado do processo que eu não sei o que significa. Isso precisa ser esclarecido. 
+A geração da Expressão técnica  também é confusa. O usuário náo saberá usar essa notação e nem mesmo a semântica disso. Se não houver necessidade de configuração por parte do usuário este campo Deve ser gerado pelo wizard ou um valor fixo apenas mostrado ao usuário
+
+-------------------------------------------------------------------
+
+
+Quais dados ficarão disponíveis?
+Informe os dados extraídos da mensagem. Cada chave do JSON vira um dado disponível para as próximas etapas.
+
+{
+  "from": "${email.from}",
+  "subject": "${email.subject}",
+  "body": "${email.body}",
+  "correlationId": "${correlationId}"
+}
+
+
+meu comentário:
+Aqui o usuário deve ser poupado de criar essa expressão ou mesmo de visualizar esta expressão.
+Acho que o usuário deve poder apenas selecionar quais dados (atributos) que vem pelo tipo de mensagem ele deseja utilizar.
+No caso do email. faltou apenas o attachment.  
+
+
+Dados que esta etapa produzirÃ¡
+correlationId
+Long
+Receber solicitacao
+Dado recebido em "Receber solicitacao"
+body
+String
+Receber solicitacao
+Dado recebido em "Receber solicitacao"
+from
+String
+Receber solicitacao
+Dado recebido em "Receber solicitacao"
+requestId
+String
+Receber solicitacao
+Identificador usado para correlacionar mensagens com a instância correta.
+subject
+String
+Receber solicitacao
+Dado recebido em "Receber solicitacao"
+Dados disponÃ­veis antes desta etapa
+Nenhum dado anterior foi identificado ainda.
+
+
+
+
+
+
+
+O que acontecerá durante a execução
+O GMS receberá a mensagem pelo canal EMAIL.
+O CIR reconhecerá o evento RECEBER_SOLICITACAO.
+Uma nova instância será iniciada ou uma mensagem será correlacionada no Camunda.
+Os dados extraídos ficarão disponíveis para as próximas etapas.
+
+

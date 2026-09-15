@@ -50,7 +50,8 @@ public class SendEmailWorker {
                 .lockDuration(10000)
                 .handler((externalTask, externalTaskService) -> {
                     String activityId = externalTask.getActivityId();
-                    String recipient = firstNonBlank(
+                    String recipient = firstValidEmailRecipient(
+                            externalTask,
                             variable(externalTask, "outboundEmailTo"),
                             recipientForActivity(activityId, externalTask)
                     );
@@ -67,7 +68,7 @@ public class SendEmailWorker {
                         externalTaskService.handleFailure(
                                 externalTask,
                                 "SEND_EMAIL missing recipient",
-                                "Could not resolve recipient for activity " + activityId,
+                                "Could not resolve a valid email recipient for activity " + activityId,
                                 3,
                                 60000
                         );
@@ -138,9 +139,13 @@ public class SendEmailWorker {
         });
 
         try {
+            String sanitizedRecipient = sanitizeEmailAddress(recipient);
+            if (sanitizedRecipient.isBlank()) {
+                throw new IllegalArgumentException("Recipient address is blank after sanitization.");
+            }
             MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(mailFrom));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipient));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(sanitizedRecipient, true));
             message.setSubject(subject, "UTF-8");
             message.setText(body, "UTF-8");
             Transport.send(message);
@@ -266,10 +271,54 @@ public class SendEmailWorker {
         return externalTask.<Object>getVariable(name);
     }
 
+    private String firstValidEmailRecipient(
+            org.camunda.bpm.client.task.ExternalTask externalTask,
+            Object... candidates) {
+        for (Object candidate : candidates) {
+            String value = sanitizeEmailAddress(candidate);
+            String expressionVariable = expressionVariableName(value);
+            if (!expressionVariable.isBlank()) {
+                value = sanitizeEmailAddress(variable(externalTask, expressionVariable));
+            }
+            if (isEmailAddress(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String sanitizeEmailAddress(Object value) {
+        if (value == null) {
+            return "";
+        }
+        return String.valueOf(value)
+                .replace("\r", "")
+                .replace("\n", "")
+                .replace("\t", "")
+                .trim();
+    }
+
+    private String expressionVariableName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("${") && trimmed.endsWith("}")) {
+            return trimmed.substring(2, trimmed.length() - 1).trim();
+        }
+        return "";
+    }
+
+    private boolean isEmailAddress(String value) {
+        return value != null
+                && value.contains("@")
+                && !value.matches(".*\\s+.*");
+    }
+
     private String firstNonBlank(Object... values) {
         for (Object value : values) {
             if (value != null && !String.valueOf(value).isBlank()) {
-                return String.valueOf(value);
+                return String.valueOf(value).trim();
             }
         }
         return "";

@@ -120,4 +120,127 @@ class MessageEventClassifierTest {
         assertThat(result.get(0).getMessageName()).isEqualTo("EMAIL_REPLY");
         assertThat(result.get(0).getCorrelationId()).isEqualTo("MSG-1788313250233");
     }
+
+    @Test
+    void routesCorrectedDataReplyToDadosComplementaresAndExtractsPayload() throws Exception {
+        Path routesFile = tempDir.resolve("routes.json");
+        Files.writeString(routesFile, """
+                {
+                  "routes": [
+                    {
+                      "externalEvent": "DADOS_COMPLEMENTARES",
+                      "action": "CORRELATE_MESSAGE",
+                      "messageName": "DADOS_COMPLEMENTARES",
+                      "correlationVariable": "correlationId"
+                    }
+                  ]
+                }
+                """);
+
+        MessageEventClassifier classifier = new MessageEventClassifier(
+                new ProcessedMessageStore(),
+                new CirRouteRepository(routesFile.toString(), new ObjectMapper()));
+
+        GmsMessage message = new GmsMessage();
+        message.setMessageId("mail-4");
+        message.setSubject("Re: Informar Dados Corretamente. MSG-1789480931597");
+        message.setBody("""
+                 MSG-1789480931597
+                Orientador: Joao Souza
+                Estudante: Aline
+                Titulo: Entrevistas de Processos
+                AreaPesquisa: Computacao
+                """);
+
+        List<ClassifiedMessage> result = classifier.classify(List.of(message));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getKind()).isEqualTo(MessageClassificationKind.REPLY);
+        assertThat(result.get(0).getMessageName()).isEqualTo("DADOS_COMPLEMENTARES");
+        assertThat(result.get(0).getCorrelationId()).isEqualTo("MSG-1789480931597");
+        assertThat(result.get(0).getVariables()).containsEntry("studentName", "Aline");
+        assertThat(result.get(0).getVariables()).containsEntry("advisorName", "Joao Souza");
+        assertThat(result.get(0).getVariables()).containsEntry("title", "Entrevistas de Processos");
+        assertThat(result.get(0).getVariables()).containsEntry("researchArea", "Computacao");
+    }
+
+    @Test
+    void classifiesAccentedAdvisorshipStartEvenWhenConfiguredSubjectIsTooSpecific() throws Exception {
+        Path routesFile = tempDir.resolve("routes.json");
+        Files.writeString(routesFile, """
+                {
+                  "routes": [
+                    {
+                      "externalEvent": "VINCULACAO_SOLICITADA",
+                      "action": "START_PROCESS",
+                      "messageName": "VINCULACAO_SOLICITADA",
+                      "correlationVariable": "correlationId",
+                      "subjectContains": "vinculacao solicitada"
+                    }
+                  ]
+                }
+                """);
+
+        MessageEventClassifier classifier = new MessageEventClassifier(
+                new ProcessedMessageStore(),
+                new CirRouteRepository(routesFile.toString(), new ObjectMapper()));
+
+        GmsMessage message = new GmsMessage();
+        message.setMessageId("mail-start-1");
+        message.setFrom("mcosta@ifes.edu.br");
+        message.setSubject("Nova vinculação");
+        message.setBody("""
+                Orientador: Joao Souza
+                Estudante: Aline
+                Título: Entrevistas de Processos
+                ÁreaPesquisa: Computação
+                """);
+
+        List<ClassifiedMessage> result = classifier.classify(List.of(message));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getKind()).isEqualTo(MessageClassificationKind.START);
+        assertThat(result.get(0).getMessageName()).isEqualTo("VINCULACAO_SOLICITADA");
+        assertThat(result.get(0).getVariables()).containsEntry("studentName", "Aline");
+        assertThat(result.get(0).getVariables()).containsEntry("advisorName", "Joao Souza");
+        assertThat(result.get(0).getVariables()).containsEntry("title", "Entrevistas de Processos");
+        assertThat(result.get(0).getVariables()).containsEntry("researchArea", "Computação");
+    }
+
+    @Test
+    void acceptsAccentedTitleAndResearchAreaLabels() throws Exception {
+        Path routesFile = tempDir.resolve("routes.json");
+        Files.writeString(routesFile, """
+                {
+                  "routes": [
+                    {
+                      "externalEvent": "DADOS_COMPLEMENTARES",
+                      "action": "CORRELATE_MESSAGE",
+                      "messageName": "DADOS_COMPLEMENTARES",
+                      "correlationVariable": "correlationId"
+                    }
+                  ]
+                }
+                """);
+
+        MessageEventClassifier classifier = new MessageEventClassifier(
+                new ProcessedMessageStore(),
+                new CirRouteRepository(routesFile.toString(), new ObjectMapper()));
+
+        GmsMessage message = new GmsMessage();
+        message.setMessageId("mail-5");
+        message.setSubject("Re: Informar Dados Corretamente. MSG-1789480931597");
+        message.setBody("""
+                CORRELATION-ID: MSG-1789480931597
+                Título: Entrevistas de Processos
+                Área: Computação
+                """);
+
+        List<ClassifiedMessage> result = classifier.classify(List.of(message));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMessageName()).isEqualTo("DADOS_COMPLEMENTARES");
+        assertThat(result.get(0).getVariables()).containsEntry("title", "Entrevistas de Processos");
+        assertThat(result.get(0).getVariables()).containsEntry("researchArea", "Computação");
+    }
 }
