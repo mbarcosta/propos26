@@ -72,6 +72,13 @@ public class PpgApiController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/students/by-name")
+    public ResponseEntity<Student> studentByName(@RequestParam String name) {
+        return store.studentByName(name)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/students")
     public Student addStudent(@RequestBody Student student) {
         return store.addStudent(student);
@@ -116,6 +123,13 @@ public class PpgApiController {
     @GetMapping("/professors/by-email")
     public ResponseEntity<Professor> professorByEmail(@RequestParam String email) {
         return store.professorByEmail(email)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/professors/by-name")
+    public ResponseEntity<Professor> professorByName(@RequestParam String name) {
+        return store.professorByName(name)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

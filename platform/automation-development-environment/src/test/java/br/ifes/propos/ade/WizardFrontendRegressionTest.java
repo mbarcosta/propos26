@@ -58,4 +58,14 @@ class WizardFrontendRegressionTest {
         assertThat(app).contains("config.emailTo = defaultEmailTo(step.elementId, step.name);");
         assertThat(app).contains("selected !== 'coordinatorEmail'");
     }
+
+    @Test
+    void deploymentEnsuresBpmnMessageReferencesForConfiguredMessageEvents() throws IOException {
+        String app = Files.readString(APP_JS);
+
+        assertThat(app).contains("function ensureMessageRefsForConfiguredEvents(doc)");
+        assertThat(app).contains("const messageNode = ensureMessageDefinition(doc, messageName);");
+        assertThat(app).contains("messageEvent.setAttribute('messageRef', messageNode.getAttribute('id'));");
+        assertThat(app).contains("ensureMessageRefsForConfiguredEvents(doc);\n  consolidateMessageDefinitions(doc);");
+    }
 }

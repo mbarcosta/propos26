@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -72,6 +73,12 @@ public class PpgDataStore {
                 .findFirst();
     }
 
+    public synchronized Optional<Student> studentByName(String name) {
+        return state.getStudents().stream()
+                .filter(item -> equalsNormalized(item.getName(), name))
+                .findFirst();
+    }
+
     public synchronized Student addStudent(Student student) {
         student.setId(state.nextStudentId());
         student.setStatus(defaultStatus(student.getStatus(), "ACTIVE"));
@@ -110,6 +117,12 @@ public class PpgDataStore {
     public synchronized Optional<Professor> professorByEmail(String email) {
         return state.getProfessors().stream()
                 .filter(item -> equalsIgnoreCase(item.getEmail(), email))
+                .findFirst();
+    }
+
+    public synchronized Optional<Professor> professorByName(String name) {
+        return state.getProfessors().stream()
+                .filter(item -> equalsNormalized(item.getName(), name))
                 .findFirst();
     }
 
@@ -340,5 +353,20 @@ public class PpgDataStore {
     private boolean equalsIgnoreCase(String left, String right) {
         return left != null && right != null
                 && left.toLowerCase(Locale.ROOT).equals(right.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean equalsNormalized(String left, String right) {
+        return !normalize(left).isBlank() && normalize(left).equals(normalize(right));
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .trim()
+                .replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
     }
 }

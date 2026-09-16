@@ -1,43 +1,13 @@
 {
   "routes" : [ {
-    "externalEvent" : "VINCULACAO_SOLICITADA",
+    "externalEvent" : "COMUNICACAO",
     "action" : "START_PROCESS",
-    "messageName" : "VINCULACAO_SOLICITADA",
-    "processDefinitionKey" : "vinculacao_orientacao",
+    "messageName" : "COMUNICACAO",
+    "processDefinitionKey" : "cadastro_de_defesa",
     "businessKeyVariable" : "correlationId",
     "correlationVariable" : "correlationId",
     "correlationExpression" : null,
     "variableMappings" : null,
-    "subjectContains" : "vinculacao"
-  }, {
-    "externalEvent" : "DADOS_COMPLEMENTARES",
-    "action" : "CORRELATE_MESSAGE",
-    "messageName" : "DADOS_COMPLEMENTARES",
-    "processDefinitionKey" : null,
-    "businessKeyVariable" : null,
-    "correlationVariable" : "correlationId",
-    "correlationExpression" : "${correlationId}",
-    "variableMappings" : "{\n  \"from\": \"${email.from}\",\n  \"subject\": \"${email.subject}\",\n  \"body\": \"${email.body}\",\n  \"correlationId\": \"${correlationId}\",\n  \"messageId\": \"${email.messageId}\",\n  \"studentId\": \"${payload.studentId}\",\n  \"advisorId\": \"${payload.advisorId}\",\n  \"studentEmail\": \"${payload.studentEmail}\",\n  \"advisorEmail\": \"${payload.advisorEmail}\",\n  \"studentName\": \"${payload.studentName}\",\n  \"advisorName\": \"${payload.advisorName}\",\n  \"title\": \"${payload.title}\",\n  \"researchArea\": \"${payload.researchArea}\"\n}",
-    "subjectContains" : null
-  }, {
-    "externalEvent" : "CONFIRMACAO_ESTUDANTE",
-    "action" : "CORRELATE_MESSAGE",
-    "messageName" : "CONFIRMACAO_ESTUDANTE",
-    "processDefinitionKey" : null,
-    "businessKeyVariable" : null,
-    "correlationVariable" : "correlationId",
-    "correlationExpression" : "${correlationId}",
-    "variableMappings" : "{\n  \"from\": \"${email.from}\",\n  \"subject\": \"${email.subject}\",\n  \"body\": \"${email.body}\",\n  \"correlationId\": \"${correlationId}\"\n}",
-    "subjectContains" : null
-  }, {
-    "externalEvent" : "CONFIRMACAO_COORDENADOR",
-    "action" : "CORRELATE_MESSAGE",
-    "messageName" : "CONFIRMACAO_COORDENADOR",
-    "processDefinitionKey" : null,
-    "businessKeyVariable" : null,
-    "correlationVariable" : "correlationId",
-    "correlationExpression" : "${correlationId}",
-    "variableMappings" : "{\n  \"from\": \"${email.from}\",\n  \"subject\": \"${email.subject}\",\n  \"body\": \"${email.body}\",\n  \"correlationId\": \"${correlationId}\"\n}",
-    "subjectContains" : null
+    "subjectContains" : "comunicacao"
   } ]
 }

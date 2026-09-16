@@ -52,6 +52,10 @@ class PpgManagementApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.registration").value("2026001"));
 
+        mockMvc.perform(get("/api/students/by-name").param("name", "maria silva"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(studentId));
+
         mockMvc.perform(get("/api/students/{id}/status", studentId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.exists").value(true))
@@ -60,9 +64,13 @@ class PpgManagementApplicationTests {
 
     @Test
     void searchesProfessorsByEmail() throws Exception {
-        long professorId = createProfessor("Joao Pereira", "joao@example.edu");
+        long professorId = createProfessor("João Pereira", "joao@example.edu");
 
         mockMvc.perform(get("/api/professors/by-email").param("email", "JOAO@example.edu"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(professorId));
+
+        mockMvc.perform(get("/api/professors/by-name").param("name", "Joao Pereira"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(professorId));
     }

@@ -61,6 +61,17 @@ paths:
       responses:
         "200": { description: OK }
         "404": { description: Not found }
+  /api/students/by-name:
+    get:
+      summary: Find student by name
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
   /api/students/{id}/status:
     get:
       summary: Return student existence and active status
@@ -105,6 +116,17 @@ paths:
       summary: Find professor by email
       parameters:
         - name: email
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+  /api/professors/by-name:
+    get:
+      summary: Find professor by name
+      parameters:
+        - name: name
           in: query
           required: true
           schema: { type: string }

@@ -1631,6 +1631,29 @@ function consolidateMessageDefinitions(doc) {
     });
 }
 
+function ensureMessageRefsForConfiguredEvents(doc) {
+  const steps = state.wizardSession?.steps || buildWizardSteps();
+  steps
+    .filter((step) => step.kind === 'START_MESSAGE_EVENT' || step.kind === 'INBOUND_EVENT')
+    .forEach((step) => {
+      const eventNode = doc.querySelector(`[id="${step.elementId}"]`);
+      const messageEvent = eventNode ? eventNode.querySelector('messageEventDefinition, bpmn\\:messageEventDefinition') : null;
+      if (!messageEvent) {
+        return;
+      }
+      const config = normalizeGuidedInboundConfig(step, state.inboundConfigs[step.elementId] || defaultWizardInboundConfig(step));
+      state.inboundConfigs[step.elementId] = config;
+      const existingRef = messageEvent.getAttribute('messageRef');
+      const existingMessage = existingRef ? doc.querySelector(`[id="${existingRef}"]`) : null;
+      if (existingMessage && existingMessage.localName === 'message') {
+        return;
+      }
+      const messageName = config.camundaMessage || config.externalEvent || inboundEventNameForWait(step.name, step.elementId);
+      const messageNode = ensureMessageDefinition(doc, messageName);
+      messageEvent.setAttribute('messageRef', messageNode.getAttribute('id'));
+    });
+}
+
 function normalizeEventName(value) {
   return (value || '')
     .normalize('NFD')
@@ -3866,8 +3889,8 @@ function capabilityCompatibilityScore(capability, step, text) {
   if (text.includes('student') || text.includes('estudante')) {
     if (capability.type === 'STUDENT' || capability.id.includes('STUDENT')) score += 4;
   }
-  if (text.includes('professor') || text.includes('orientador')) {
-    if (capability.type === 'PROFESSOR' || capability.id.includes('PROFESSOR')) score += 4;
+  if (text.includes('professor') || text.includes('orientador') || text.includes('advisor')) {
+    if (capability.type === 'PROFESSOR' || capability.id.includes('PROFESSOR') || capability.id.includes('ADVISOR')) score += 4;
   }
   if (text.includes('defesa') || text.includes('dissertation')) {
     if (capability.type === 'DEFENSE' || capability.type === 'DISSERTATION_DOCUMENT') score += 4;
@@ -4350,7 +4373,10 @@ function validateProject() {
         }
       }
     });
-  if (!state.integration.correlationField) errors.push('Correlation field is required');
+  const startIntegration = currentStartIntegration();
+  if (!startIntegration.correlationField) {
+    errors.push('Start event correlation identifier could not be derived. Reopen the wizard for the start event so the ADE can generate correlationId.');
+  }
 
   if (errors.length) {
     setStatus('DRAFT');
@@ -4403,6 +4429,10 @@ function synchronizeEventDefinitionOrder() {
       }
     });
   });
+
+  ensureMessageRefsForConfiguredEvents(doc);
+  consolidateMessageDefinitions(doc);
+  changed = true;
 
   if (changed) {
     xmlBox.value = new XMLSerializer().serializeToString(doc);
@@ -4768,6 +4798,7 @@ async function synchronizeAutomationConfigurationToBpmn(reloadCanvas = true) {
     }
   });
   applyFlowConditions(doc);
+  ensureMessageRefsForConfiguredEvents(doc);
   consolidateMessageDefinitions(doc);
   if (state.processConfig.historyTimeToLive) {
     const processNode = doc.querySelector('process, bpmn\\:process');
