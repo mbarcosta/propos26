@@ -64,8 +64,11 @@ docker compose down
 OpenAPI:
 
 ```text
-openapi.yaml
+GET /v3/api-docs
 ```
+
+`src/main/resources/openapi-runtime.json` is the provider-owned runtime contract. The historical
+root `openapi.yaml` remains a human-readable inventory but is not the discovery source used by ADE.
 
 ## UI
 

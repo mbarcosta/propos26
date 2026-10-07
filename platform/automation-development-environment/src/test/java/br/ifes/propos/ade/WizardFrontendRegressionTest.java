@@ -68,4 +68,16 @@ class WizardFrontendRegressionTest {
         assertThat(app).contains("messageEvent.setAttribute('messageRef', messageNode.getAttribute('id'));");
         assertThat(app).contains("ensureMessageRefsForConfiguredEvents(doc);\n  consolidateMessageDefinitions(doc);");
     }
+
+    @Test
+    void inboundEmailCanCaptureDataRequiredByASelectedCapability() throws IOException {
+        String app = Files.readString(APP_JS);
+
+        assertThat(app).contains("Selecionar dados de uma capability");
+        assertThat(app).contains("data-inbound-capability");
+        assertThat(app).contains("data-capability-input-field");
+        assertThat(app).contains("extractionFieldFromSchema(parameter, schemaForParameter(capability, fieldName))");
+        assertThat(app).contains("state.dataResolutionPlans[elementId][fieldName] = { strategy: 'MESSAGE_EXTRACTION', source: fieldName }");
+        assertThat(app).contains("await publishExtractionContract(inboundId)");
+    }
 }

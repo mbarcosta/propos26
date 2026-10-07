@@ -1,5 +1,6 @@
 package br.ifes.propos.ade.model;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +17,16 @@ public record AutomationCapability(
         String implementationType,
         String implementation,
         String deployment,
-        String status
+        String status,
+        String operationId,
+        String protocol,
+        String method,
+        CapabilitySchema inputSchema,
+        CapabilitySchema outputSchema,
+        String contractVersion,
+        String contractFingerprint,
+        Instant lastDiscoveredAt,
+        boolean stale,
+        String discoveryError
 ) {
 }

@@ -19,6 +19,9 @@ const state = {
   inboundConfigs: {},
   outboundConfigs: {},
   flowConditions: {},
+  dataResolutionPlans: {},
+  inputExtractionContracts: {},
+  capabilityContractFingerprints: {},
   integration: {},
   processConfig: { historyTimeToLive: '180' },
   wizardSession: null,
@@ -231,6 +234,9 @@ function project() {
     deploymentHistory: state.deploymentHistory || [],
     wizardSession: state.wizardSession,
     flowConditions: state.flowConditions,
+    dataResolutionPlans: state.dataResolutionPlans,
+    inputExtractionContracts: state.inputExtractionContracts,
+    capabilityContractFingerprints: state.capabilityContractFingerprints,
     processConfig: state.processConfig,
     integration: startIntegration,
     status: state.status,
@@ -508,10 +514,20 @@ function hydrateProject(data) {
   state.inboundConfigs = data.inboundConfigs || {};
   state.outboundConfigs = data.outboundConfigs || {};
   state.flowConditions = data.flowConditions || {};
+  state.dataResolutionPlans = data.dataResolutionPlans || {};
+  state.inputExtractionContracts = data.inputExtractionContracts || {};
+  state.capabilityContractFingerprints = data.capabilityContractFingerprints || {};
   state.processConfig = data.processConfig || { historyTimeToLive: '180' };
   state.integration = data.integration || {};
   document.getElementById('historyTimeToLive').value = state.processConfig.historyTimeToLive || '180';
   setStatus(data.status || 'DRAFT');
+  const changedContract = Object.entries(state.bindings).some(([elementId, capabilityId]) => {
+    const capability = findCapability(capabilityId);
+    const current = capability?.contractFingerprint;
+    const configured = state.capabilityContractFingerprints[elementId];
+    return !capability || (current && configured && current !== configured);
+  });
+  if (changedContract) setStatus('CONFIGURATION_REVIEW_REQUIRED');
   state.dirty = false;
 }
 
@@ -730,6 +746,10 @@ function renderProjectList() {
 function renderCapabilities() {
   const container = document.getElementById('capabilityList');
   if (!container) {
+    return;
+  }
+  if (!(state.capabilities || []).length) {
+    container.innerHTML = '<div class="wizard-message warning">Nenhuma capability foi carregada. Use "Refresh capabilities" e verifique o diagnostico exibido acima.</div>';
     return;
   }
   container.innerHTML = (state.capabilities || []).map((capability) => `
@@ -1145,6 +1165,8 @@ function renderCapabilityContract(capability) {
         <tr><th>Provider</th><td>${escapeHtml(capability.provider || '')}</td></tr>
         <tr><th>Interface</th><td>${escapeHtml(capability.interfaceType || '')}</td></tr>
         <tr><th>Endpoint/Topic</th><td>${escapeHtml(capability.endpoint || '')}</td></tr>
+        ${capability.method ? `<tr><th>Operation</th><td>${escapeHtml(capability.method)} ${escapeHtml(capability.operationId || '')}</td></tr>` : ''}
+        ${capability.contractFingerprint ? `<tr><th>Contract</th><td>${escapeHtml((capability.contractVersion || 'unversioned') + ' / ' + capability.contractFingerprint.slice(0, 12))}${capability.stale ? ' (cached; provider unavailable)' : ''}</td></tr>` : ''}
       </tbody>
     </table>
     <strong>Input Parameters</strong>
@@ -2761,6 +2783,8 @@ function defaultWizardInboundConfig(step) {
 
 async function wizardSelectCapability(elementId, capabilityId) {
   state.bindings[elementId] = capabilityId;
+  const selectedContract = findCapability(capabilityId);
+  if (selectedContract?.contractFingerprint) state.capabilityContractFingerprints[elementId] = selectedContract.contractFingerprint;
   const requirement = state.requirements.find((item) => item.elementId === elementId);
   if (requirement) requirement.capabilityId = capabilityId;
   await applyCapabilityToBpmnElement(elementId, capabilityId);
@@ -3312,6 +3336,14 @@ function addProducedVariablesForStep(variables, step) {
         availability: 'AVAILABLE'
       });
     });
+    (state.inputExtractionContracts[step.elementId]?.outputs || []).forEach((field) => add({
+      name: field.name,
+      type: field.type,
+      origin: `${step.name} / extracao CIR`,
+      producerElement: step.elementId,
+      description: 'Dado obtido do corpo da mensagem por contrato de extracao configurado pelo ADE.',
+      availability: 'AVAILABLE'
+    }));
     if (inbound.correlationField) {
       add({
         name: inbound.correlationField,
@@ -3409,7 +3441,7 @@ function renderCapabilityNeedReturn(capability) {
 
 function renderFriendlyParameterList(parameters) {
   if (!parameters.length) return '<p><small>Nenhum dado.</small></p>';
-  return `<ul>${parameters.map((parameter) => `<li>${escapeHtml(friendlyParameterName(parameter.name))} <small>${escapeHtml(parameter.name)}:${escapeHtml(parameter.type || '')}</small></li>`).join('')}</ul>`;
+  return `<ul>${parameters.map((parameter) => `<li>${escapeHtml(friendlyParameterName(parameter.name))} <small>${escapeHtml(parameter.name)}:${escapeHtml(parameter.type || '')}${parameter.required === 'false' ? ' (optional)' : ' (required)'}</small></li>`).join('')}</ul>`;
 }
 
 function friendlyParameterName(name) {
@@ -3423,10 +3455,76 @@ function renderCapabilityMappingEditor(elementId, capability, context = buildPro
   return `
     <h3>Como os dados serão usados?</h3>
     <div>
-      ${(capability.inputParameters || []).map((parameter) => renderTutorialInputMapping(elementId, parameter, context)).join('')}
+      <p>Estes requisitos foram obtidos automaticamente do contrato atual de ${escapeHtml(capability.provider || 'provider')}.</p>
+      ${(capability.inputParameters || []).map((parameter) => renderDataRequirementResolution(elementId, capability, parameter, context)).join('')}
       <h3>Quais resultados você deseja disponibilizar para as próximas etapas?</h3>
       ${(capability.outputParameters || []).map((parameter) => renderTutorialOutputMapping(elementId, parameter)).join('')}
     </div>`;
+}
+
+function renderDataRequirementResolution(elementId, capability, parameter, context) {
+  const plan = state.dataResolutionPlans[elementId]?.[parameter.name] || {};
+  const mappings = state.variableMappings[elementId] || { inputs: {} };
+  const compatible = sortedVariablesForType(context.variables, normalizeCapabilityType(parameter.type));
+  const inbound = previousEmailInbound(elementId);
+  const strategy = plan.strategy || ((mappings.inputs || {})[parameter.name] ? 'MAPPING' : '');
+  const lookupCapabilities = (state.capabilities || []).filter((item) =>
+    item.id !== capability.id && (item.outputParameters || []).some((output) => isCompatibleVariableType(output.type, parameter.type)));
+  const selectedLookup = lookupCapabilities.find((item) => item.id === plan.capabilityId);
+  const lookupSources = selectedLookup
+    ? context.variables.filter((variable) => (selectedLookup.inputParameters || []).some((input) => isCompatibleVariableType(variable.type, input.type)))
+    : context.variables;
+  const sourceOptions = (strategy === 'CAPABILITY_LOOKUP' ? lookupSources : context.variables).map((item) => `<option value="${escapeAttribute(item.name)}" ${plan.source === item.name ? 'selected' : ''}>${escapeHtml(item.name)} (${escapeHtml(item.type)})</option>`).join('');
+  return `<div class="branch-row">
+    <strong>${escapeHtml(parameter.name)} : ${escapeHtml(parameter.type)} ${parameter.required === 'false' ? '(opcional)' : '(obrigatorio)'}</strong>
+    <label>Como este valor sera obtido?</label>
+    <select data-resolution-strategy="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}">
+      <option value="">Configurar origem</option>
+      ${compatible.length ? `<option value="MAPPING" ${strategy === 'MAPPING' ? 'selected' : ''}>Usar dado existente</option>` : ''}
+      ${inbound ? `<option value="MESSAGE_EXTRACTION" ${strategy === 'MESSAGE_EXTRACTION' ? 'selected' : ''}>Extrair da mensagem</option>` : ''}
+      ${context.variables.length ? `<option value="TRANSFORMATION" ${strategy === 'TRANSFORMATION' ? 'selected' : ''}>Transformar outro dado</option>` : ''}
+      ${lookupCapabilities.length ? `<option value="CAPABILITY_LOOKUP" ${strategy === 'CAPABILITY_LOOKUP' ? 'selected' : ''}>Obter usando outra funcionalidade</option>` : ''}
+    </select>
+    ${strategy === 'MAPPING' ? renderVariablePicker(parameter.name, elementId, (mappings.inputs || {})[parameter.name] || '', context, normalizeCapabilityType(parameter.type), 'data-wizard-mapping-input') : ''}
+    ${strategy === 'MESSAGE_EXTRACTION' ? `<div class="wizard-message info">Sera obtido do corpo do e-mail em ${escapeHtml(inbound?.name || '')}; o ADE gera e envia o contrato estruturado ao CIR.</div>` : ''}
+    ${strategy === 'TRANSFORMATION' ? `<select data-resolution-source="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}"><option value="">Dado de origem</option>${sourceOptions}</select><input data-resolution-transform="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}" value="${escapeAttribute(plan.transformation || '')}" placeholder="Conversao (ex.: parse Date)">` : ''}
+    ${strategy === 'CAPABILITY_LOOKUP' ? `<select data-resolution-lookup="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}"><option value="">Funcionalidade de consulta</option>${lookupCapabilities.map((item) => `<option value="${escapeAttribute(item.id)}" ${plan.capabilityId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select><select data-resolution-source="${escapeAttribute(elementId)}" data-field="${escapeAttribute(parameter.name)}"><option value="">Dado usado na consulta</option>${sourceOptions}</select>` : ''}
+  </div>`;
+}
+
+function previousEmailInbound(elementId) {
+  const context = buildProcessDataContext(elementId);
+  const producerIds = new Set(context.variables.map((item) => item.producerElement));
+  const step = (state.wizardSession?.steps || buildWizardSteps()).find((item) =>
+    item.kind === 'START_MESSAGE_EVENT' && producerIds.has(item.elementId));
+  return step || (state.wizardSession?.steps || buildWizardSteps()).find((item) => item.kind === 'START_MESSAGE_EVENT') || null;
+}
+
+function schemaForParameter(capability, parameterName) {
+  return capability.inputSchema?.properties?.find((item) => item.name === parameterName) || null;
+}
+
+function extractionFieldFromSchema(parameter, schema) {
+  const itemProperties = schema?.items?.properties || [];
+  return {
+    name: parameter.name, label: parameter.name, type: parameter.type,
+    required: parameter.required !== 'false',
+    properties: itemProperties.map((item) => ({ name: item.name, label: item.name, type: item.type, required: item.required, properties: [] }))
+  };
+}
+
+async function publishExtractionContract(inboundId) {
+  const contract = state.inputExtractionContracts[inboundId];
+  const event = state.inboundConfigs[inboundId]?.externalEvent;
+  if (!contract || !event) return;
+  contract.event = event;
+  try {
+    await fetch(`/api/extraction-configurations/${encodeURIComponent(event)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contract)
+    });
+  } catch (error) {
+    contract.publicationError = String(error.message || error);
+  }
 }
 
 function renderTutorialInputMapping(elementId, parameter, context) {
@@ -3475,6 +3573,8 @@ function bindWizardContentEvents() {
       const elementId = input.dataset.wizardMappingInput;
       state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
       state.variableMappings[elementId].inputs[input.dataset.field] = toExpression(input.value);
+      state.dataResolutionPlans[elementId] = state.dataResolutionPlans[elementId] || {};
+      state.dataResolutionPlans[elementId][input.dataset.field] = { strategy: 'MAPPING', source: input.value };
       saveProject();
       renderRequirements();
       renderWizard();
@@ -3485,6 +3585,28 @@ function bindWizardContentEvents() {
       const elementId = input.dataset.wizardMappingOutput;
       state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
       state.variableMappings[elementId].outputs[input.dataset.param] = input.value.trim();
+      saveProject();
+      renderRequirements();
+      renderWizard();
+    });
+  });
+  document.querySelectorAll('select[data-inbound-capability]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const elementId = input.dataset.inboundCapability;
+      state.inboundConfigs[elementId] = state.inboundConfigs[elementId] || { bpmnElementId: elementId };
+      state.inboundConfigs[elementId].extractionCapabilityId = input.value;
+      saveProject();
+      renderWizard();
+    });
+  });
+  document.querySelectorAll('input[data-capability-input-field]').forEach((input) => {
+    input.addEventListener('change', async () => {
+      await toggleCapabilityInputExtraction(
+        input.dataset.capabilityInputField,
+        input.dataset.capabilityId,
+        input.value,
+        input.checked
+      );
       saveProject();
       renderRequirements();
       renderWizard();
@@ -3502,6 +3624,45 @@ function bindWizardContentEvents() {
       renderWizard();
     });
   });
+  document.querySelectorAll('select[data-resolution-strategy]').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const elementId = input.dataset.resolutionStrategy;
+      const fieldName = input.dataset.field;
+      const capability = findCapability(state.bindings[elementId]);
+      const parameter = (capability?.inputParameters || []).find((item) => item.name === fieldName);
+      state.dataResolutionPlans[elementId] = state.dataResolutionPlans[elementId] || {};
+      state.dataResolutionPlans[elementId][fieldName] = { strategy: input.value };
+      if (input.value === 'MESSAGE_EXTRACTION' && parameter) {
+        const inbound = previousEmailInbound(elementId);
+        if (inbound) {
+          const contract = state.inputExtractionContracts[inbound.elementId] || {
+            channel: 'EMAIL', sourcePart: 'BODY', strategy: 'STRUCTURED_TEMPLATE', outputs: []
+          };
+          contract.contractFingerprint = capability.contractFingerprint || '';
+          contract.outputs = (contract.outputs || []).filter((field) => field.name !== fieldName);
+          contract.outputs.push(extractionFieldFromSchema(parameter, schemaForParameter(capability, fieldName)));
+          state.inputExtractionContracts[inbound.elementId] = contract;
+          await publishExtractionContract(inbound.elementId);
+        }
+      }
+      saveProject(); renderRequirements(); renderWizard();
+    });
+  });
+  document.querySelectorAll('select[data-resolution-source]').forEach((input) => input.addEventListener('change', () => {
+    const plan = state.dataResolutionPlans[input.dataset.resolutionSource]?.[input.dataset.field];
+    if (plan) plan.source = input.value;
+    saveProject(); renderWizard();
+  }));
+  document.querySelectorAll('input[data-resolution-transform]').forEach((input) => input.addEventListener('change', () => {
+    const plan = state.dataResolutionPlans[input.dataset.resolutionTransform]?.[input.dataset.field];
+    if (plan) plan.transformation = input.value.trim();
+    saveProject(); renderWizard();
+  }));
+  document.querySelectorAll('select[data-resolution-lookup]').forEach((input) => input.addEventListener('change', () => {
+    const plan = state.dataResolutionPlans[input.dataset.resolutionLookup]?.[input.dataset.field];
+    if (plan) plan.capabilityId = input.value;
+    saveProject(); renderWizard();
+  }));
   document.querySelectorAll('select[data-value-source]').forEach((input) => {
     input.addEventListener('change', () => {
       const field = input.dataset.valueSource;
@@ -3538,6 +3699,7 @@ function bindWizardContentEvents() {
         state.wizardSession.steps[state.wizardSession.currentStep],
         state.inboundConfigs[elementId]
       );
+      if (input.dataset.field === 'externalEvent') publishExtractionContract(elementId);
       if (input.dataset.field === 'correlationField') {
         state.inboundConfigs[elementId].correlationExpression = toExpression(input.value);
       }
@@ -3596,9 +3758,10 @@ function renderInboundWizard(step) {
       ${renderBpmnMessageDecision(step, config, messages, messageForElement)}
     </div>
     ${isStart ? renderStartIdentifierPanel(config) : renderCatchCorrelationPanel(step, config, context)}
+    ${renderCapabilityDataSelector(step)}
     <div class="wizard-card">
       <h3>Dados recebidos</h3>
-      <p>Escolha quais campos da entrada serao disponibilizados para o processo.</p>
+      <p>Escolha os campos comuns do e-mail que serao disponibilizados para o processo.</p>
       ${renderInboundFieldSelector(step, schema, selectedFields)}
       <h3>Dados produzidos</h3>
       ${renderProcessDataContext(buildProducedDataContext(step))}
@@ -3724,6 +3887,81 @@ function renderInboundFieldSelector(step, schema, selectedFields) {
         <span><strong>${escapeHtml(field.variable)}</strong><br><small>${escapeHtml(note)}</small></span>
       </label>`;
   }).join('')}</div>`;
+}
+
+function renderCapabilityDataSelector(step) {
+  const config = state.inboundConfigs[step.elementId] || {};
+  const capabilities = capabilitiesWithInputData(step.elementId);
+  const selectedId = config.extractionCapabilityId || '';
+  const capability = findCapability(selectedId);
+  const outputs = state.inputExtractionContracts[step.elementId]?.outputs || [];
+  return `
+    <div class="wizard-card">
+      <h3>Dados exigidos pelas capabilities</h3>
+      <div class="wizard-message info"><strong>Selecionar dados de uma capability</strong>: use esta opcao para capturar no e-mail dados como data da defesa, local e comite avaliador.</div>
+      <label>1. Selecione a capability que utilizara os dados</label>
+      <select data-inbound-capability="${escapeAttribute(step.elementId)}">
+        <option value="">Selecionar capability</option>
+        ${capabilities.map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHtml(item.name || item.id)} (${escapeHtml(item.id)})</option>`).join('')}
+      </select>
+      ${capability ? `
+        <h4>2. Selecione os dados que devem ser capturados</h4>
+        <p><small>Contrato descoberto em ${escapeHtml(capability.provider || 'provider')}. Os campos selecionados passam a integrar o contrato de extracao enviado ao CIR.</small></p>
+        <div class="wizard-field-list">
+          ${(capability.inputParameters || []).map((parameter) => {
+            const checked = outputs.some((field) => field.name === parameter.name);
+            return `<label class="wizard-field-row">
+              <input type="checkbox" data-capability-input-field="${escapeAttribute(step.elementId)}" data-capability-id="${escapeAttribute(capability.id)}" value="${escapeAttribute(parameter.name)}" ${checked ? 'checked' : ''}>
+              <span>${escapeHtml(friendlyParameterName(parameter.name))}</span>
+              <small>${escapeHtml(parameter.type || 'String')}</small>
+              <span><strong>${escapeHtml(parameter.name)}</strong><br><small>${parameter.required === 'false' ? 'Opcional' : 'Obrigatorio'} para ${escapeHtml(capability.name || capability.id)}</small></span>
+            </label>`;
+          }).join('') || '<p><small>Esta capability nao declara dados de entrada.</small></p>'}
+        </div>` : ''}
+    </div>`;
+}
+
+function capabilitiesWithInputData(inboundId) {
+  const boundIds = new Set(Object.entries(state.bindings || {})
+    .filter(([elementId]) => elementId !== inboundId)
+    .map(([, capabilityId]) => capabilityId));
+  return (state.capabilities || [])
+    .filter((capability) => (capability.inputParameters || []).length)
+    .sort((left, right) => {
+      const bindingPriority = Number(boundIds.has(right.id)) - Number(boundIds.has(left.id));
+      return bindingPriority || String(left.name || left.id).localeCompare(String(right.name || right.id));
+    });
+}
+
+async function toggleCapabilityInputExtraction(inboundId, capabilityId, fieldName, checked) {
+  const capability = findCapability(capabilityId);
+  const parameter = (capability?.inputParameters || []).find((item) => item.name === fieldName);
+  if (!capability || !parameter) return;
+  const contract = state.inputExtractionContracts[inboundId] || {
+    channel: 'EMAIL', sourcePart: 'BODY', strategy: 'STRUCTURED_TEMPLATE', outputs: []
+  };
+  contract.outputs = (contract.outputs || []).filter((field) => field.name !== fieldName);
+  if (checked) {
+    contract.outputs.push(extractionFieldFromSchema(parameter, schemaForParameter(capability, fieldName)));
+    contract.contractFingerprint = capability.contractFingerprint || contract.contractFingerprint || '';
+  }
+  state.inputExtractionContracts[inboundId] = contract;
+
+  Object.entries(state.bindings || {})
+    .filter(([, boundCapabilityId]) => boundCapabilityId === capabilityId)
+    .forEach(([elementId]) => {
+      state.dataResolutionPlans[elementId] = state.dataResolutionPlans[elementId] || {};
+      state.variableMappings[elementId] = state.variableMappings[elementId] || { inputs: {}, outputs: {} };
+      state.variableMappings[elementId].inputs = state.variableMappings[elementId].inputs || {};
+      if (checked) {
+        state.dataResolutionPlans[elementId][fieldName] = { strategy: 'MESSAGE_EXTRACTION', source: fieldName };
+        state.variableMappings[elementId].inputs[fieldName] = toExpression(fieldName);
+      } else {
+        if (state.dataResolutionPlans[elementId][fieldName]?.strategy === 'MESSAGE_EXTRACTION') delete state.dataResolutionPlans[elementId][fieldName];
+        if (state.variableMappings[elementId].inputs[fieldName] === toExpression(fieldName)) delete state.variableMappings[elementId].inputs[fieldName];
+      }
+    });
+  await publishExtractionContract(inboundId);
 }
 
 function renderExternalEventDecision(step, config, events) {
@@ -5033,14 +5271,47 @@ function renderProject() {
     : '<p><small>No project open.</small></p>';
 }
 
+async function refreshCapabilities() {
+  const status = document.getElementById('capabilityRefreshStatus');
+  status.textContent = 'Atualizando contratos...';
+  try {
+    const response = await fetch('/api/capabilities/refresh', { method: 'POST' });
+    const result = await response.json();
+    state.capabilities = await fetch('/api/capabilities').then((item) => item.json());
+    renderCapabilities();
+    const changed = Object.entries(state.bindings || {}).some(([elementId, capabilityId]) => {
+      const capability = findCapability(capabilityId);
+      const current = capability?.contractFingerprint;
+      return !capability || (current && state.capabilityContractFingerprints[elementId] && current !== state.capabilityContractFingerprints[elementId]);
+    });
+    if (changed) setStatus('CONFIGURATION_REVIEW_REQUIRED');
+    status.textContent = result.current
+      ? `${result.discoveredCapabilities} capabilities descobertas em runtime.`
+      : `Ultimo contrato conhecido em uso: ${Object.values(result.providerErrors || {}).join('; ')}`;
+    if (state.activeProjectOpen) { renderRequirements(); renderProject(); }
+  } catch (error) {
+    status.textContent = `Nao foi possivel atualizar: ${error.message || error}`;
+  }
+}
+
 async function init() {
   seedExampleProjects();
-  state.capabilities = await fetch('/api/capabilities').then((response) => response.json());
+  try {
+    const response = await fetch('/api/capabilities');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.capabilities = await response.json();
+    document.getElementById('capabilityRefreshStatus').textContent = `${state.capabilities.length} capabilities carregadas.`;
+  } catch (error) {
+    state.capabilities = [];
+    document.getElementById('capabilityRefreshStatus').textContent = `Falha ao carregar capabilities: ${error.message || error}`;
+  }
   renderCapabilities();
   const runtime = await fetch('/api/runtime').then((response) => response.json());
   document.getElementById('runtime').textContent = `Camunda: ${runtime.camundaBaseUrl}`;
   openInitialProject();
 }
+
+document.getElementById('refreshCapabilities').addEventListener('click', refreshCapabilities);
 
 document.querySelectorAll('button[data-tab]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -5195,7 +5466,8 @@ function renderCapabilityMappingEditor(elementId, capability, context = buildPro
   return `
     <h3>Como os dados serao usados?</h3>
     <div>
-      ${(capability.inputParameters || []).map((parameter) => renderTutorialInputMapping(elementId, parameter, context)).join('')}
+      <p>Esses requisitos foram obtidos automaticamente do contrato atual de ${escapeHtml(capability.provider || 'provider')}.</p>
+      ${(capability.inputParameters || []).map((parameter) => renderDataRequirementResolution(elementId, capability, parameter, context)).join('')}
       <h3>Quais resultados voce deseja disponibilizar para as proximas etapas?</h3>
       ${(capability.outputParameters || []).map((parameter) => renderTutorialOutputMapping(elementId, parameter)).join('')}
     </div>`;
@@ -5270,6 +5542,13 @@ function validateCapabilityAndMappings(step, issues) {
     return;
   }
   const context = buildProcessDataContext(step.elementId);
+  const savedFingerprint = state.capabilityContractFingerprints[step.elementId];
+  if (savedFingerprint && capability.contractFingerprint && savedFingerprint !== capability.contractFingerprint) {
+    issues.push({ level: 'ERROR', message: 'O contrato desta funcionalidade mudou desde a configuracao. Revise as entradas e suas origens antes de continuar.' });
+  }
+  if (capability.stale) {
+    issues.push({ level: 'WARNING', message: `Nao foi possivel atualizar o contrato; usando a ultima versao conhecida de ${capability.lastDiscoveredAt || 'data desconhecida'}.` });
+  }
   if (isAdvisorshipCheckCapability(capability)) {
     ensureAdvisorshipCheckDefaults(step.elementId, context);
     validateAdvisorshipCheckMappings(step, context, issues);
@@ -5277,6 +5556,16 @@ function validateCapabilityAndMappings(step, issues) {
   }
   const mappings = state.variableMappings[step.elementId] || { inputs: {}, outputs: {} };
   (capability.inputParameters || []).forEach((parameter) => {
+    const resolution = state.dataResolutionPlans[step.elementId]?.[parameter.name];
+    if (resolution?.strategy === 'MESSAGE_EXTRACTION') return;
+    if (resolution?.strategy === 'TRANSFORMATION' && resolution.source && resolution.transformation) {
+      issues.push({ level: 'ERROR', message: `${parameter.name} possui uma transformacao planejada, mas ainda precisa de uma etapa executavel anterior que produza ${parameter.type}.` });
+      return;
+    }
+    if (resolution?.strategy === 'CAPABILITY_LOOKUP' && resolution.source && resolution.capabilityId) {
+      issues.push({ level: 'ERROR', message: `${parameter.name} possui lookup planejado em ${resolution.capabilityId}, mas essa capability ainda precisa ser inserida antes desta tarefa.` });
+      return;
+    }
     const value = ((mappings.inputs || {})[parameter.name] || '').trim();
     const expectedType = normalizeCapabilityType(parameter.type);
     if (!value) {

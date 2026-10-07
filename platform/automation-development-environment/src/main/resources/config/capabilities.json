@@ -254,34 +254,6 @@
     "status": "AVAILABLE"
   },
   {
-    "id": "CREATE_DEFENSE",
-    "name": "Create Defense",
-    "description": "Create a master's defense record.",
-    "type": "DEFENSE",
-    "provider": "PPG Management",
-    "interfaceType": "REST",
-    "endpoint": "POST /api/defenses",
-    "inputParameters": [
-      { "name": "studentId", "type": "Long" },
-      { "name": "advisorId", "type": "Long" },
-      { "name": "title", "type": "String" },
-      { "name": "date", "type": "Date" },
-      { "name": "location", "type": "String" },
-      { "name": "committeeMembers", "type": "Array<CommitteeMember>" }
-    ],
-    "outputParameters": [
-      { "name": "defenseId", "type": "Long" },
-      { "name": "defenseStatus", "type": "String" },
-      { "name": "defenseTitle", "type": "String" },
-      { "name": "defenseDate", "type": "Date" },
-      { "name": "defenseLocation", "type": "String" }
-    ],
-    "implementationType": "REST_SERVICE",
-    "implementation": "ppg-management-service",
-    "deployment": "domain-systems/ppg-management-service",
-    "status": "AVAILABLE"
-  },
-  {
     "id": "GET_DEFENSE",
     "name": "Get Defense",
     "description": "Get a defense by identifier.",

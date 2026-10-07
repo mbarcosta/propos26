@@ -1,0 +1,56 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "PPG Management Service API", "version": "0.4.0" },
+  "paths": {
+    "/api/defenses": {
+      "post": {
+        "operationId": "CREATE_DEFENSE",
+        "summary": "Create defense",
+        "description": "Registers a defense using the current domain contract.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateDefenseRequest" } } } },
+        "responses": { "200": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Defense" } } } } }
+      }
+    },
+    "/api/students/by-email": {
+      "get": {
+        "operationId": "FIND_STUDENT_BY_EMAIL", "summary": "Find student by email",
+        "parameters": [{ "name": "email", "in": "query", "required": true, "schema": { "type": "string", "format": "email" } }],
+        "responses": { "200": { "description": "Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Student" } } } } }
+      }
+    },
+    "/api/professors/by-email": {
+      "get": {
+        "operationId": "FIND_PROFESSOR_BY_EMAIL", "summary": "Find professor by email",
+        "parameters": [{ "name": "email", "in": "query", "required": true, "schema": { "type": "string", "format": "email" } }],
+        "responses": { "200": { "description": "Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Professor" } } } } }
+      }
+    }
+  },
+  "components": { "schemas": {
+    "CreateDefenseRequest": {
+      "type": "object",
+      "required": ["studentId", "advisorId", "title", "date", "location", "committeeMembers"],
+      "properties": {
+        "studentId": { "type": "integer", "format": "int64" },
+        "advisorId": { "type": "integer", "format": "int64" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "location": { "type": "string" },
+        "committeeMembers": { "type": "array", "items": { "$ref": "#/components/schemas/CommitteeMember" } }
+      }
+    },
+    "CommitteeMember": {
+      "type": "object", "required": ["name", "email", "institution", "role"],
+      "properties": {
+        "name": { "type": "string" }, "email": { "type": "string", "format": "email" },
+        "institution": { "type": "string" }, "role": { "type": "string" }
+      }
+    },
+    "Defense": {
+      "allOf": [{ "$ref": "#/components/schemas/CreateDefenseRequest" }],
+      "type": "object", "properties": { "id": { "type": "integer", "format": "int64" }, "status": { "type": "string" } }
+    },
+    "Student": { "type": "object", "properties": { "id": { "type": "integer", "format": "int64" }, "email": { "type": "string" }, "name": { "type": "string" } } },
+    "Professor": { "type": "object", "properties": { "id": { "type": "integer", "format": "int64" }, "email": { "type": "string" }, "name": { "type": "string" } } }
+  } }
+}

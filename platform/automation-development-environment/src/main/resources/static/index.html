@@ -206,7 +206,7 @@
       body.project-browser aside {
         display: none;
       }
-      body.no-project nav button {
+      body.no-project nav button:disabled {
         opacity: 0.45;
       }
       .project-list {
@@ -525,7 +525,7 @@
       <nav>
         <button data-tab="bpmn" data-requires-project>BPMN</button>
         <button data-tab="automation" data-requires-project>Automation</button>
-        <button data-tab="capabilities" data-requires-project>Capabilities</button>
+        <button data-tab="capabilities">Capabilities</button>
         <button data-tab="integrations" data-requires-project>Integrations</button>
         <button data-tab="deployment" data-requires-project>Deployment</button>
         <button data-tab="execution" data-requires-project>Execution</button>
@@ -595,6 +595,10 @@
         </section>
         <section id="capabilities">
           <h2>Capabilities</h2>
+          <div class="row">
+            <button id="refreshCapabilities" type="button">Refresh capabilities</button>
+            <span id="capabilityRefreshStatus"></span>
+          </div>
           <div id="capabilityList"></div>
         </section>
         <section id="integrations">

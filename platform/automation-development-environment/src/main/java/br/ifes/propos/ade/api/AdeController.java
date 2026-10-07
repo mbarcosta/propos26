@@ -7,6 +7,12 @@ import br.ifes.propos.ade.service.CapabilityRegistryService;
 import br.ifes.propos.ade.service.CamundaDeploymentService;
 import br.ifes.propos.ade.service.CamundaInstanceService;
 import br.ifes.propos.ade.service.CirExecutionService;
+import br.ifes.propos.ade.service.DataRequirementResolver;
+import br.ifes.propos.ade.service.ExtractionConfigurationService;
+import br.ifes.propos.ade.service.MessageTemplateGenerator;
+import br.ifes.propos.ade.service.ProcessInputRequirementAnalyzer;
+import br.ifes.propos.ade.model.DataRequirement;
+import br.ifes.propos.ade.model.DataResolutionPlan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,12 +41,20 @@ public class AdeController {
     private final String camundaBaseUrl;
     private final String cirBaseUrl;
     private final String gmsBaseUrl;
+    private final DataRequirementResolver dataRequirementResolver;
+    private final MessageTemplateGenerator templateGenerator;
+    private final ExtractionConfigurationService extractionConfigurationService;
+    private final ProcessInputRequirementAnalyzer processInputRequirementAnalyzer;
 
     public AdeController(
             CapabilityRegistryService capabilityRegistryService,
             CamundaDeploymentService deploymentService,
             CirExecutionService cirExecutionService,
             CamundaInstanceService camundaInstanceService,
+            DataRequirementResolver dataRequirementResolver,
+            MessageTemplateGenerator templateGenerator,
+            ExtractionConfigurationService extractionConfigurationService,
+            ProcessInputRequirementAnalyzer processInputRequirementAnalyzer,
             @Value("${camunda.base-url}") String camundaBaseUrl,
             @Value("${cir.base-url}") String cirBaseUrl,
             @Value("${gms.base-url}") String gmsBaseUrl) {
@@ -51,6 +65,10 @@ public class AdeController {
         this.camundaBaseUrl = camundaBaseUrl;
         this.cirBaseUrl = cirBaseUrl;
         this.gmsBaseUrl = gmsBaseUrl;
+        this.dataRequirementResolver = dataRequirementResolver;
+        this.templateGenerator = templateGenerator;
+        this.extractionConfigurationService = extractionConfigurationService;
+        this.processInputRequirementAnalyzer = processInputRequirementAnalyzer;
     }
 
     @GetMapping("/health")
@@ -70,6 +88,47 @@ public class AdeController {
     @GetMapping("/capabilities")
     public List<AutomationCapability> capabilities() {
         return capabilityRegistryService.capabilities();
+    }
+
+    @PostMapping("/capabilities/refresh")
+    public CapabilityRegistryService.RefreshResult refreshCapabilities() {
+        return capabilityRegistryService.refresh();
+    }
+
+    @GetMapping("/capabilities/status")
+    public CapabilityRegistryService.RefreshResult capabilityDiscoveryStatus() {
+        return capabilityRegistryService.status();
+    }
+
+    @PostMapping("/capabilities/{id}/requirements/resolve")
+    public List<DataRequirement> resolveRequirements(@PathVariable String id,
+                                                      @RequestBody RequirementResolutionRequest request) {
+        return dataRequirementResolver.resolve(capabilityRegistryService.capability(id), request.availableData(), request.plan());
+    }
+
+    @GetMapping("/capabilities/{id}/message-template")
+    public Map<String, String> messageTemplate(@PathVariable String id) {
+        AutomationCapability capability = capabilityRegistryService.capability(id);
+        return Map.of("capabilityId", id, "template", templateGenerator.generate(capability.inputSchema()));
+    }
+
+    @PostMapping("/extraction-configurations/{event}")
+    public Object publishExtractionConfiguration(@PathVariable String event,
+                                                 @RequestBody Map<String, Object> contract) {
+        return extractionConfigurationService.publish(event, contract);
+    }
+
+    @PostMapping("/process-input-requirements/analyze")
+    public List<ProcessInputRequirementAnalyzer.TaskAnalysis> analyzeProcessInputs(
+            @RequestBody List<ProcessInputRequirementAnalyzer.TaskSnapshot> tasks) {
+        return processInputRequirementAnalyzer.analyze(tasks);
+    }
+
+    public record RequirementResolutionRequest(List<DataRequirementResolver.ProcessData> availableData,
+                                               DataResolutionPlan plan) {
+        public RequirementResolutionRequest {
+            availableData = availableData == null ? List.of() : List.copyOf(availableData);
+        }
     }
 
     @PostMapping("/deployments")

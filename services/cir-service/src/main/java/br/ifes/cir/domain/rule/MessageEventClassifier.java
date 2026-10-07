@@ -8,11 +8,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import br.ifes.cir.client.dto.GmsMessage;
 import br.ifes.cir.domain.config.CirRouteDefinition;
 import br.ifes.cir.domain.config.CirRouteRepository;
 import br.ifes.cir.domain.store.ProcessedMessageStore;
+import br.ifes.cir.domain.extraction.DataExtractionProvider;
+import br.ifes.cir.domain.extraction.ExtractionContractRepository;
+import br.ifes.cir.domain.extraction.InputExtractionContract;
 
 /**
  * Componente responsável por classificar mensagens retornadas pelo GMS
@@ -42,6 +46,8 @@ public class MessageEventClassifier {
      */
     private final ProcessedMessageStore store;
     private final CirRouteRepository routeRepository;
+    private final ExtractionContractRepository extractionRepository;
+    private final List<DataExtractionProvider> extractionProviders;
 
     /**
      * Padrão explícito para extração da chave de correlação.
@@ -75,8 +81,17 @@ public class MessageEventClassifier {
             Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9\\-_./]*-[A-Za-z0-9][A-Za-z0-9\\-_./]*)\\]");
 
     public MessageEventClassifier(ProcessedMessageStore store, CirRouteRepository routeRepository) {
+        this(store, routeRepository, null, List.of());
+    }
+
+    @Autowired
+    public MessageEventClassifier(ProcessedMessageStore store, CirRouteRepository routeRepository,
+                                  ExtractionContractRepository extractionRepository,
+                                  List<DataExtractionProvider> extractionProviders) {
         this.store = store;
         this.routeRepository = routeRepository;
+        this.extractionRepository = extractionRepository;
+        this.extractionProviders = extractionProviders;
     }
 
     /**
@@ -270,6 +285,7 @@ public class MessageEventClassifier {
         }
         classified.addVariable("externalEvent", route.getExternalEvent());
         classified.addVariable("correlationVariable", route.getCorrelationVariable());
+        applyConfiguredExtraction(classified, message, route);
         return classified;
     }
 
@@ -283,8 +299,31 @@ public class MessageEventClassifier {
         classified.addVariable("processDefinitionKey", route.getProcessDefinitionKey());
         classified.addVariable("correlationVariable", route.getCorrelationVariable());
         classified.addVariable("requesterEmail", message.getFrom());
-        addAdvisorshipRequestVariables(classified, message);
+        if (!applyConfiguredExtraction(classified, message, route)) {
+            addAdvisorshipRequestVariables(classified, message);
+        }
         return classified;
+    }
+
+    private boolean applyConfiguredExtraction(ClassifiedMessage classified, GmsMessage message,
+                                               CirRouteDefinition route) {
+        if (extractionRepository == null || route.getExternalEvent() == null) return false;
+        var configured = extractionRepository.findByEvent(route.getExternalEvent());
+        if (configured.isEmpty()) return false;
+        InputExtractionContract contract = configured.get();
+        String source = "SUBJECT".equalsIgnoreCase(contract.getSourcePart()) ? message.getSubject() : message.getBody();
+        var provider = extractionProviders.stream().filter(item -> item.supports(contract.getStrategy())).findFirst();
+        if (provider.isEmpty()) {
+            classified.addVariable("extractionValid", false);
+            classified.addVariable("extractionDiagnostics", List.of("No DataExtractionProvider supports " + contract.getStrategy()));
+            return true;
+        }
+        var result = provider.get().extract(contract, source);
+        result.values().forEach(classified::addVariable);
+        classified.addVariable("extractionValid", result.valid());
+        classified.addVariable("extractionDiagnostics", result.diagnostics());
+        classified.addVariable("extractionContractFingerprint", contract.getContractFingerprint());
+        return true;
     }
 
     private void addAdvisorshipRequestVariables(ClassifiedMessage classified, GmsMessage message) {

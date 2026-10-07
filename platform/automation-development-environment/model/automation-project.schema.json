@@ -121,6 +121,18 @@
       "type": "object",
       "additionalProperties": { "type": "object", "additionalProperties": true }
     },
+    "dataResolutionPlans": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/dataResolutionEntry" } }
+    },
+    "inputExtractionContracts": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": true }
+    },
+    "capabilityContractFingerprints": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
     "derivedConfig": {
       "type": "object",
       "additionalProperties": true
@@ -128,6 +140,18 @@
   },
   "additionalProperties": true,
   "$defs": {
+    "dataResolutionEntry": {
+      "type": "object",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": { "enum": ["MAPPING", "MESSAGE_EXTRACTION", "TRANSFORMATION", "CAPABILITY_LOOKUP"] },
+        "source": { "type": "string" },
+        "capabilityId": { "type": "string" },
+        "capabilityOutput": { "type": "string" },
+        "transformation": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "automationRequirement": {
       "type": "object",
       "required": ["elementId", "type"],

@@ -1,13 +1,13 @@
 {
   "routes" : [ {
-    "externalEvent" : "COMUNICACAO",
+    "externalEvent" : "ENVIAR_MENSAGEM",
     "action" : "START_PROCESS",
-    "messageName" : "COMUNICACAO",
-    "processDefinitionKey" : "cadastro_de_defesa",
+    "messageName" : "ENVIAR_MENSAGEM",
+    "processDefinitionKey" : "enviar_email",
     "businessKeyVariable" : "correlationId",
     "correlationVariable" : "correlationId",
     "correlationExpression" : null,
     "variableMappings" : null,
-    "subjectContains" : "comunicacao"
+    "subjectContains" : "enviar mensagem"
   } ]
 }
