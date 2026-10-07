@@ -80,4 +80,12 @@ class WizardFrontendRegressionTest {
         assertThat(app).contains("state.dataResolutionPlans[elementId][fieldName] = { strategy: 'MESSAGE_EXTRACTION', source: fieldName }");
         assertThat(app).contains("await publishExtractionContract(inboundId)");
     }
+
+    @Test
+    void createDefensePublishesSemanticDefenseIdForFollowingTasks() throws IOException {
+        String app = Files.readString(APP_JS);
+
+        assertThat(app).contains("state.bindings[elementId] === 'CREATE_DEFENSE' && parameter.name === 'id'");
+        assertThat(app).contains("outputName = 'defenseId'");
+    }
 }

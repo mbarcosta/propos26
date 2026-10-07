@@ -208,6 +208,41 @@ class MessageEventClassifierTest {
     }
 
     @Test
+    void configuredStartRouteMatchesSubjectWithUnderscores() throws Exception {
+        Path routesFile = tempDir.resolve("defense-routes.json");
+        Files.writeString(routesFile, """
+                {
+                  "routes": [
+                    {
+                      "externalEvent": "CADASTRO_DE_DEFESA",
+                      "action": "START_PROCESS",
+                      "messageName": "CADASTRO_DE_DEFESA",
+                      "processDefinitionKey": "cadastro_de_defesa",
+                      "correlationVariable": "correlationId",
+                      "subjectContains": "cadastro de defesa"
+                    }
+                  ]
+                }
+                """);
+
+        MessageEventClassifier classifier = new MessageEventClassifier(
+                new ProcessedMessageStore(),
+                new CirRouteRepository(routesFile.toString(), new ObjectMapper()));
+
+        GmsMessage message = new GmsMessage();
+        message.setMessageId("mail-defense-start-1");
+        message.setSubject("CADASTRO_DE_DEFESA");
+        message.setBody("date: 2026-11-20");
+
+        List<ClassifiedMessage> result = classifier.classify(List.of(message));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getKind()).isEqualTo(MessageClassificationKind.START);
+        assertThat(result.get(0).getMessageName()).isEqualTo("CADASTRO_DE_DEFESA");
+        assertThat(result.get(0).getVariables()).containsEntry("externalEvent", "CADASTRO_DE_DEFESA");
+    }
+
+    @Test
     void acceptsAccentedTitleAndResearchAreaLabels() throws Exception {
         Path routesFile = tempDir.resolve("routes.json");
         Files.writeString(routesFile, """

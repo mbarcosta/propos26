@@ -36,12 +36,20 @@ public class CirRouteRepository {
     }
 
     public synchronized Optional<CirRouteDefinition> findStartRouteBySubject(String subject) {
-        String normalized = normalize(subject);
+        String normalized = normalizeSubject(subject);
         return findAll().stream()
                 .filter(route -> "START_PROCESS".equalsIgnoreCase(route.getAction()))
                 .filter(route -> route.getSubjectContains() != null)
-                .filter(route -> normalized.contains(normalize(route.getSubjectContains())))
+                .filter(route -> normalized.contains(normalizeSubject(route.getSubjectContains())))
                 .findFirst();
+    }
+
+    private String normalizeSubject(String value) {
+        return normalize(value)
+                .replace('_', ' ')
+                .replace('-', ' ')
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     public synchronized Optional<CirRouteDefinition> findReplyRoute(String subject, String body) {

@@ -25,6 +25,8 @@
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
       th, td { border-bottom: 1px solid #e6ebf0; padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: #52616f; }
+      a.button { display: inline-block; border: 1px solid #9aa6b2; color: #17202a; text-decoration: none; border-radius: 4px; padding: 7px 10px; white-space: nowrap; }
+      .muted { color: #697886; }
     </style>
   </head>
   <body>
@@ -90,7 +92,7 @@
       </section>
 
       <section>
-        <h2>Dissertation Document</h2>
+        <h2>Dissertations</h2>
         <p id="documentsMessage" class="message"></p>
         <form id="documentForm">
           <div class="form-grid">
@@ -100,6 +102,7 @@
           <div class="form-actions"><button class="primary" type="submit">Upload or Replace</button><button type="button" id="loadDocument">Load Metadata</button></div>
         </form>
         <pre id="documentInfo"></pre>
+        <table id="documents"></table>
       </section>
 
       <section>
@@ -111,6 +114,7 @@
       let students = [];
       let professors = [];
       let defenses = [];
+      let documents = [];
 
       async function json(path, options) {
         const response = await fetch(path, options);
@@ -178,16 +182,55 @@
           <button type="button" data-document-defense="${defense.id}">Document</button>`);
       }
 
+      function renderDocuments() {
+        const rows = documents.map((document) => {
+          const defense = defenses.find((item) => item.id === document.defenseId);
+          const student = students.find((item) => item.id === defense?.studentId);
+          return {
+            ...document,
+            student: student?.name || `Student ${defense?.studentId ?? '-'}`,
+            defense: defense?.title || `Defense ${document.defenseId}`,
+            size: formatBytes(document.size),
+            uploadedAt: formatDateTime(document.uploadedAt)
+          };
+        });
+        table('documents', ['student', 'defense', 'fileName', 'version', 'size', 'uploadedAt'], rows, (document) => `
+          <a class="button" href="/api/dissertations/${encodeURIComponent(document.documentId)}/view" target="_blank" rel="noopener">View</a>
+          <a class="button" href="/api/dissertations/${encodeURIComponent(document.documentId)}/download" download>Download</a>`);
+        if (!rows.length) {
+          document.getElementById('documentsMessage').textContent = 'No dissertations have been submitted.';
+        }
+      }
+
+      function formatBytes(value) {
+        const bytes = Number(value || 0);
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      function formatDateTime(value) {
+        if (!value) return '';
+        // Java's OffsetDateTime may contain up to nine fractional digits, while
+        // some browsers only accept milliseconds in ISO timestamps.
+        const normalized = String(value).replace(/(\.\d{3})\d+(?=Z|[+-]\d{2}:\d{2}$)/, '$1');
+        const parsed = new Date(normalized);
+        if (Number.isNaN(parsed.getTime())) return String(value);
+        return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(parsed);
+      }
+
       async function load() {
-        const [loadedStudents, loadedProfessors, programs, advisorships, loadedDefenses] = await Promise.all([
-          json('/api/students'), json('/api/professors'), json('/api/programs'), json('/api/advisorships'), json('/api/defenses')
+        const [loadedStudents, loadedProfessors, programs, advisorships, loadedDefenses, loadedDocuments] = await Promise.all([
+          json('/api/students'), json('/api/professors'), json('/api/programs'), json('/api/advisorships'), json('/api/defenses'), json('/api/dissertations')
         ]);
         students = loadedStudents;
         professors = loadedProfessors;
         defenses = loadedDefenses;
+        documents = loadedDocuments;
         renderStudents();
         renderProfessors();
         renderDefenses();
+        renderDocuments();
         table('programs', ['id', 'name', 'institution', 'campus', 'coordinatorName', 'coordinatorEmail'], programs);
         table('advisorships', ['id', 'studentId', 'advisorId', 'title', 'researchArea', 'startDate', 'status'], advisorships, (item) => `
           <button type="button" data-cancel-advisorship="${item.id}">Cancel</button>`);
@@ -244,6 +287,7 @@
         const metadata = await json(`/api/defenses/${defenseId}/dissertation`, { method: 'POST', body });
         document.getElementById('documentInfo').textContent = JSON.stringify(metadata, null, 2);
         document.getElementById('documentsMessage').textContent = 'Document uploaded.';
+        await load();
       }
 
       async function loadDocumentMetadata() {
@@ -259,7 +303,10 @@
         if (target.editStudent) fillForm('studentForm', students.find((item) => String(item.id) === target.editStudent));
         if (target.editProfessor) fillForm('professorForm', professors.find((item) => String(item.id) === target.editProfessor));
         if (target.editDefense) fillForm('defenseForm', defenses.find((item) => String(item.id) === target.editDefense));
-        if (target.documentDefense) document.getElementById('documentForm').elements.defenseId.value = target.documentDefense;
+        if (target.documentDefense) {
+          document.getElementById('documentForm').elements.defenseId.value = target.documentDefense;
+          document.getElementById('documentForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         if (target.deleteStudent && confirm('Delete this student?')) await json(`/api/students/${target.deleteStudent}`, { method: 'DELETE' }).then(load);
         if (target.deleteProfessor && confirm('Delete this professor?')) await json(`/api/professors/${target.deleteProfessor}`, { method: 'DELETE' }).then(load);
         if (target.cancelAdvisorship && confirm('Cancel this advisorship?')) await json(`/api/advisorships/${target.cancelAdvisorship}/cancel`, { method: 'POST' }).then(load);
@@ -276,7 +323,10 @@
       document.getElementById('documentForm').addEventListener('submit', uploadDocument);
       document.getElementById('loadDocument').addEventListener('click', loadDocumentMetadata);
       document.addEventListener('click', handleClick);
-      load();
+      load().catch((error) => {
+        document.getElementById('documentsMessage').textContent = `Could not load data: ${error.message}`;
+        console.error(error);
+      });
     </script>
   </body>
 </html>

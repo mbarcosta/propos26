@@ -3366,7 +3366,11 @@ function addProducedVariablesForStep(variables, step) {
       ? advisorshipCheckOutputParameters()
       : (capability.outputParameters || []);
     outputParameters.forEach((parameter) => {
-      const outputName = mappings.outputs[parameter.name];
+      let outputName = mappings.outputs[parameter.name];
+      if (capability.id === 'CREATE_DEFENSE' && parameter.name === 'id' && (!outputName || outputName === 'id')) {
+        outputName = 'defenseId';
+        mappings.outputs[parameter.name] = outputName;
+      }
       if (outputName) {
         add({
           name: stripExpression(outputName),
@@ -4323,6 +4327,9 @@ function buildProducedDataContext(step) {
 }
 
 function defaultOutputVariableName(elementId, parameter) {
+  if (state.bindings[elementId] === 'CREATE_DEFENSE' && parameter.name === 'id') {
+    return 'defenseId';
+  }
   if (normalizeCapabilityType(parameter.type) === 'Boolean') {
     const nextGatewayName = findNextGatewayName(elementId);
     if (nextGatewayName) {
@@ -5531,7 +5538,10 @@ function applyDeterministicMappingDefaults(elementId, capability) {
     state.variableMappings[elementId].inputs[parameter.name] = state.variableMappings[elementId].inputs[parameter.name] || '${' + parameter.name + '}';
   });
   (capability.outputParameters || []).forEach((parameter) => {
-    state.variableMappings[elementId].outputs[parameter.name] = state.variableMappings[elementId].outputs[parameter.name] || defaultOutputVariableName(elementId, parameter);
+    const current = state.variableMappings[elementId].outputs[parameter.name];
+    state.variableMappings[elementId].outputs[parameter.name] = capability.id === 'CREATE_DEFENSE' && parameter.name === 'id' && (!current || current === 'id')
+      ? 'defenseId'
+      : current || defaultOutputVariableName(elementId, parameter);
   });
 }
 

@@ -337,7 +337,7 @@
     "interfaceType": "REST_MULTIPART",
     "endpoint": "POST /api/defenses/{defenseId}/dissertation multipart/form-data",
     "inputParameters": [{ "name": "defenseId", "type": "Long" }, { "name": "file", "type": "File", "contentType": "multipart/form-data" }],
-    "outputParameters": [{ "name": "documentId", "type": "Long" }, { "name": "fileName", "type": "String" }, { "name": "version", "type": "String" }, { "name": "downloadUrl", "type": "String" }],
+    "outputParameters": [{ "name": "documentId", "type": "String" }, { "name": "fileName", "type": "String" }, { "name": "contentType", "type": "String" }, { "name": "size", "type": "Long" }, { "name": "version", "type": "Integer" }, { "name": "uploadedAt", "type": "DateTime" }],
     "implementationType": "REST_SERVICE",
     "implementation": "ppg-management-service",
     "deployment": "domain-systems/ppg-management-service",

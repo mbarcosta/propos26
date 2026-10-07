@@ -23,7 +23,7 @@
       "ingestionPolicy": {
         "includeBody": true,
         "includeAttachmentMetadata": true,
-        "includeAttachmentContent": false,
+        "includeAttachmentContent": true,
         "ignoreAutoReply": true
       }
     }

@@ -294,6 +294,19 @@ public class PpgDataStore {
                 .toList();
     }
 
+    public synchronized List<DissertationDocument> dissertationDocuments() {
+        return state.getDissertationDocuments().stream()
+                .sorted(Comparator.comparing(DissertationDocument::getUploadedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    public synchronized Optional<DissertationDocument> dissertationDocument(String documentId) {
+        return state.getDissertationDocuments().stream()
+                .filter(item -> documentId.equals(item.getDocumentId()))
+                .findFirst();
+    }
+
     private int nextDissertationVersion(Long defenseId) {
         return state.getDissertationDocuments().stream()
                 .filter(item -> defenseId.equals(item.getDefenseId()))

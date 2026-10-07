@@ -1,10 +1,10 @@
 {
-  "studentSequence" : 4,
-  "professorSequence" : 3,
+  "studentSequence" : 10,
+  "professorSequence" : 7,
   "programSequence" : 1,
-  "advisorshipSequence" : 3,
-  "defenseSequence" : 0,
-  "documentSequence" : 0,
+  "advisorshipSequence" : 12,
+  "defenseSequence" : 4,
+  "documentSequence" : 2,
   "students" : [ {
     "id" : 1,
     "registration" : "2026001",
@@ -29,6 +29,42 @@
     "name" : "Aline",
     "email" : "mbarcosta@gmail.com",
     "status" : "ACTIVE"
+  }, {
+    "id" : 5,
+    "registration" : "2026101",
+    "name" : "Beatriz Almeida",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 6,
+    "registration" : "2026102",
+    "name" : "Carlos Henrique",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 7,
+    "registration" : "2026103",
+    "name" : "Daniela Rocha",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 8,
+    "registration" : "2026104",
+    "name" : "Eduardo Martins",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 9,
+    "registration" : "2026105",
+    "name" : "Fernanda Lima",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 10,
+    "registration" : "2026106",
+    "name" : "Gabriel Santos",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
   } ],
   "professors" : [ {
     "id" : 1,
@@ -44,6 +80,26 @@
     "id" : 3,
     "name" : "Oirentador1",
     "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 4,
+    "name" : "Helena Carvalho",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 5,
+    "name" : "Igor Nascimento",
+    "email" : "mcostaifes@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 6,
+    "name" : "Juliana Ferreira",
+    "email" : "mbarcosta@gmail.com",
+    "status" : "ACTIVE"
+  }, {
+    "id" : 7,
+    "name" : "Lucas Oliveira",
+    "email" : "mcostaifes@gmail.com",
     "status" : "ACTIVE"
   } ],
   "programs" : [ {
@@ -78,7 +134,201 @@
     "researchArea" : "Computação",
     "startDate" : [ 2026, 9, 15 ],
     "status" : "IN_PROGRESS"
+  }, {
+    "id" : 4,
+    "studentId" : 5,
+    "advisorId" : 4,
+    "title" : "Mineracao de Processos Educacionais",
+    "researchArea" : "Sistemas de Informacao",
+    "startDate" : [ 2026, 10, 1 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 5,
+    "studentId" : 6,
+    "advisorId" : 5,
+    "title" : "Arquitetura de Automacao Academica",
+    "researchArea" : "Engenharia de Software",
+    "startDate" : [ 2026, 10, 2 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 6,
+    "studentId" : 7,
+    "advisorId" : 6,
+    "title" : "Modelagem de Processos Colaborativos",
+    "researchArea" : "Gestao de Processos",
+    "startDate" : [ 2026, 10, 3 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 7,
+    "studentId" : 8,
+    "advisorId" : 7,
+    "title" : "Inteligencia Artificial em Workflows",
+    "researchArea" : "Inteligencia Artificial",
+    "startDate" : [ 2026, 10, 4 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 8,
+    "studentId" : 9,
+    "advisorId" : 4,
+    "title" : "Descoberta de Processos Organizacionais",
+    "researchArea" : "Ciencia de Dados",
+    "startDate" : [ 2026, 10, 5 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 9,
+    "studentId" : 10,
+    "advisorId" : 5,
+    "title" : "Integracao de Sistemas Orientada a Eventos",
+    "researchArea" : "Sistemas Distribuidos",
+    "startDate" : [ 2026, 10, 6 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 10,
+    "studentId" : 1,
+    "advisorId" : 4,
+    "title" : "Automacao de Processos Administrativos",
+    "researchArea" : "Sistemas de Informacao",
+    "startDate" : [ 2026, 9, 20 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 11,
+    "studentId" : 2,
+    "advisorId" : 2,
+    "title" : "Automacao de Processos de Negocio",
+    "researchArea" : "Gestao de Processos",
+    "startDate" : [ 2026, 9, 21 ],
+    "status" : "IN_PROGRESS"
+  }, {
+    "id" : 12,
+    "studentId" : 3,
+    "advisorId" : 1,
+    "title" : "Automacao de Processos de Negocio Quanticos",
+    "researchArea" : "Sistemas de Informacao",
+    "startDate" : [ 2026, 9, 22 ],
+    "status" : "IN_PROGRESS"
   } ],
-  "defenses" : [ ],
-  "dissertationDocuments" : [ ]
+  "defenses" : [ {
+    "id" : 1,
+    "studentId" : 4,
+    "advisorId" : 1,
+    "title" : "Entrevistas de Processos",
+    "date" : [ 2026, 11, 20 ],
+    "location" : "Sala 201 - Campus Serra",
+    "status" : "HOMOLOGATED",
+    "committeeMembers" : [ {
+      "name" : "Joao Souza",
+      "email" : "mcostaifes@gmail.com",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Ana Paula Ribeiro",
+      "email" : "ana.ribeiro@ufes.br",
+      "institution" : "UFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Carlos Eduardo Lima",
+      "email" : "carlos.lima@ifes.edu.br",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    } ],
+    "createdAt" : 1791338973.231645311,
+    "updatedAt" : 1791339068.928576678
+  }, {
+    "id" : 2,
+    "studentId" : 3,
+    "advisorId" : 1,
+    "title" : "Automacao de Processos de Negocio Quanticos",
+    "date" : [ 2026, 11, 20 ],
+    "location" : "Sala 201 - Campus Serra",
+    "status" : "HOMOLOGATED",
+    "committeeMembers" : [ {
+      "name" : "Joao Souza",
+      "email" : "mcostaifes@gmail.com<mailto:mcostaifes@gmail.com>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Ana Paula Ribeiro",
+      "email" : "ana.ribeiro@ufes.br<mailto:ana.ribeiro@ufes.br>",
+      "institution" : "UFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Carlos Eduardo Lima",
+      "email" : "carlos.lima@ifes.edu.br<mailto:carlos.lima@ifes.edu.br>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    } ],
+    "createdAt" : 1791341401.636029553,
+    "updatedAt" : 1791341401.636029553
+  }, {
+    "id" : 3,
+    "studentId" : 3,
+    "advisorId" : 1,
+    "title" : "Automacao de Processos de Negocio Quanticos",
+    "date" : [ 2026, 11, 20 ],
+    "location" : "Sala 201 - Campus Serra",
+    "status" : "HOMOLOGATED",
+    "committeeMembers" : [ {
+      "name" : "Joao Souza",
+      "email" : "mcostaifes@gmail.com<mailto:mcostaifes@gmail.com>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Ana Paula Ribeiro",
+      "email" : "ana.ribeiro@ufes.br<mailto:ana.ribeiro@ufes.br>",
+      "institution" : "UFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Carlos Eduardo Lima",
+      "email" : "carlos.lima@ifes.edu.br<mailto:carlos.lima@ifes.edu.br>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    } ],
+    "createdAt" : 1791342598.956739240,
+    "updatedAt" : 1791342598.956739240
+  }, {
+    "id" : 4,
+    "studentId" : 3,
+    "advisorId" : 1,
+    "title" : "Automacao de Processos de Negocio Quanticos",
+    "date" : [ 2026, 11, 20 ],
+    "location" : "Sala 201 - Campus Serra",
+    "status" : "HOMOLOGATED",
+    "committeeMembers" : [ {
+      "name" : "Joao Souza",
+      "email" : "mcostaifes@gmail.com<mailto:mcostaifes@gmail.com>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Ana Paula Ribeiro",
+      "email" : "ana.ribeiro@ufes.br<mailto:ana.ribeiro@ufes.br>",
+      "institution" : "UFES",
+      "role" : "MEMBER"
+    }, {
+      "name" : "Carlos Eduardo Lima",
+      "email" : "carlos.lima@ifes.edu.br<mailto:carlos.lima@ifes.edu.br>",
+      "institution" : "IFES",
+      "role" : "MEMBER"
+    } ],
+    "createdAt" : 1791343717.192402160,
+    "updatedAt" : 1791343717.192402160
+  } ],
+  "dissertationDocuments" : [ {
+    "documentId" : "DOC-d078cb1c-aeeb-4027-a212-615888121b69",
+    "defenseId" : 3,
+    "fileName" : "407e08ac-b1d3-42d4-a896-a0ab4aac5f35-20241115094602653.pdf",
+    "contentType" : "application/pdf",
+    "size" : 591796,
+    "uploadedAt" : 1791342896.729870289,
+    "version" : 1,
+    "storagePath" : "/documents/DOC-d078cb1c-aeeb-4027-a212-615888121b69.pdf"
+  }, {
+    "documentId" : "DOC-27300178-7460-41d0-9d20-e31e9988e8ad",
+    "defenseId" : 4,
+    "fileName" : "20241115094602653.pdf",
+    "contentType" : "application/pdf",
+    "size" : 591796,
+    "uploadedAt" : 1791343717.324444894,
+    "version" : 1,
+    "storagePath" : "/documents/DOC-27300178-7460-41d0-9d20-e31e9988e8ad.pdf"
+  } ]
 }

@@ -1,13 +1,13 @@
 {
   "routes" : [ {
-    "externalEvent" : "ENVIAR_MENSAGEM",
+    "externalEvent" : "CADASTRO_DE_DEFESA",
     "action" : "START_PROCESS",
-    "messageName" : "ENVIAR_MENSAGEM",
-    "processDefinitionKey" : "enviar_email",
+    "messageName" : "CADASTRO_DE_DEFESA",
+    "processDefinitionKey" : "cadastro_de_defesa",
     "businessKeyVariable" : "correlationId",
     "correlationVariable" : "correlationId",
     "correlationExpression" : null,
     "variableMappings" : null,
-    "subjectContains" : "enviar mensagem"
+    "subjectContains" : "cadastro de defesa"
   } ]
 }

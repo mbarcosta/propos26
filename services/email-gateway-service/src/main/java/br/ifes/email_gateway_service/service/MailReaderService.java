@@ -11,6 +11,7 @@ import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
 import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeUtility;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.mail.search.FlagTerm;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,9 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 
 /**
  * Serviço responsável por acessar uma caixa postal via IMAP
@@ -53,9 +57,12 @@ import java.util.Properties;
 public class MailReaderService {
 
     private final String sslTrust;
+    private final Path attachmentDirectory;
 
-    public MailReaderService(@Value("${app.mail.ssl.trust:imap.gmail.com}") String sslTrust) {
+    public MailReaderService(@Value("${app.mail.ssl.trust:imap.gmail.com}") String sslTrust,
+                             @Value("${app.mail.attachment-directory:/attachments}") String attachmentDirectory) {
         this.sslTrust = sslTrust;
+        this.attachmentDirectory = Path.of(attachmentDirectory);
     }
 
     /**
@@ -313,8 +320,43 @@ public class MailReaderService {
         email.setInReplyTo(extractHeader(message, "In-Reply-To"));
         email.setReferences(extractReferences(message));
         email.setHasAttachments(detectAttachments(message));
+        if (binding.getIngestionPolicy() != null
+                && (binding.getIngestionPolicy().isIncludeAttachmentMetadata()
+                    || binding.getIngestionPolicy().isIncludeAttachmentContent())) {
+            extractFirstAttachment(message, email, binding.getIngestionPolicy().isIncludeAttachmentContent());
+        }
 
         return email;
+    }
+
+    private boolean extractFirstAttachment(Part part, EmailMessage email, boolean includeContent) {
+        try {
+            Object content = part.getContent();
+            if (content instanceof Multipart multipart) {
+                for (int i = 0; i < multipart.getCount(); i++) {
+                    if (extractFirstAttachment(multipart.getBodyPart(i), email, includeContent)) return true;
+                }
+                return false;
+            }
+            String disposition = part.getDisposition();
+            boolean attachment = Part.ATTACHMENT.equalsIgnoreCase(disposition) || part.getFileName() != null;
+            if (!attachment) return false;
+            String fileName = part.getFileName() == null ? "attachment.bin" : MimeUtility.decodeText(part.getFileName());
+            email.setAttachmentFileName(fileName);
+            email.setAttachmentContentType(part.getContentType());
+            if (includeContent) {
+                byte[] bytes = part.getInputStream().readAllBytes();
+                if (bytes.length > 15 * 1024 * 1024) throw new IllegalArgumentException("Attachment exceeds 15 MB: " + fileName);
+                Files.createDirectories(attachmentDirectory);
+                String safeName = fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+                Path target = attachmentDirectory.resolve(UUID.randomUUID() + "-" + safeName).normalize();
+                Files.write(target, bytes);
+                email.setAttachmentFilePath(target.toString());
+            }
+            return true;
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not extract email attachment", e);
+        }
     }
 
     /**

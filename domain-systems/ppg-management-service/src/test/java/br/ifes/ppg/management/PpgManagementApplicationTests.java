@@ -165,6 +165,22 @@ class PpgManagementApplicationTests {
                 .andExpect(header().string("Content-Disposition", containsString("dissertacao.txt")))
                 .andExpect(content().string("conteudo da dissertacao"));
 
+        String documents = mockMvc.perform(get("/api/dissertations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].defenseId").value(defenseId))
+                .andReturn().getResponse().getContentAsString();
+        String documentId = objectMapper.readTree(documents).get(0).get("documentId").asText();
+
+        mockMvc.perform(get("/api/dissertations/{documentId}/view", documentId))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", containsString("inline")))
+                .andExpect(content().string("conteudo da dissertacao"));
+
+        mockMvc.perform(get("/api/dissertations/{documentId}/download", documentId))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", containsString("attachment")))
+                .andExpect(content().string("conteudo da dissertacao"));
+
         mockMvc.perform(post("/api/defenses/{defenseId}/dissertation/download-link", defenseId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defenseId").value(defenseId))

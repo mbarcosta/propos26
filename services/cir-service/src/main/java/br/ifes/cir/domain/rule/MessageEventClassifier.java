@@ -299,9 +299,8 @@ public class MessageEventClassifier {
         classified.addVariable("processDefinitionKey", route.getProcessDefinitionKey());
         classified.addVariable("correlationVariable", route.getCorrelationVariable());
         classified.addVariable("requesterEmail", message.getFrom());
-        if (!applyConfiguredExtraction(classified, message, route)) {
-            addAdvisorshipRequestVariables(classified, message);
-        }
+        addAdvisorshipRequestVariables(classified, message);
+        applyConfiguredExtraction(classified, message, route);
         return classified;
     }
 
@@ -410,6 +409,10 @@ public class MessageEventClassifier {
         classified.addVariable("subject", message.getSubject());
         classified.addVariable("body", message.getBody());
         classified.addVariable("hasAttachments", message.isHasAttachments());
+        if (message.getAttachmentFileName() != null) classified.addVariable("fileName", message.getAttachmentFileName());
+        if (message.getAttachmentContentType() != null) classified.addVariable("fileContentType", message.getAttachmentContentType());
+        if (message.getAttachmentContentBase64() != null) classified.addVariable("fileContentBase64", message.getAttachmentContentBase64());
+        if (message.getAttachmentFilePath() != null) classified.addVariable("filePath", message.getAttachmentFilePath());
 
         return classified;
     }

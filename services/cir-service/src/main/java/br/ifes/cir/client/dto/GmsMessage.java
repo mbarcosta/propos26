@@ -65,6 +65,10 @@ public class GmsMessage {
      * Indica se a mensagem possui anexos.
      */
     private boolean hasAttachments;
+    private String attachmentFileName;
+    private String attachmentContentType;
+    private String attachmentContentBase64;
+    private String attachmentFilePath;
 
     public String getMessageId() {
         return messageId;
@@ -153,4 +157,12 @@ public class GmsMessage {
     public void setHasAttachments(boolean hasAttachments) {
         this.hasAttachments = hasAttachments;
     }
+    public String getAttachmentFileName() { return attachmentFileName; }
+    public void setAttachmentFileName(String value) { attachmentFileName = value; }
+    public String getAttachmentContentType() { return attachmentContentType; }
+    public void setAttachmentContentType(String value) { attachmentContentType = value; }
+    public String getAttachmentContentBase64() { return attachmentContentBase64; }
+    public void setAttachmentContentBase64(String value) { attachmentContentBase64 = value; }
+    public String getAttachmentFilePath() { return attachmentFilePath; }
+    public void setAttachmentFilePath(String value) { attachmentFilePath = value; }
 }

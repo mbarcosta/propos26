@@ -341,8 +341,8 @@
     "reference" : "#/components/schemas/Defense"
   },
   "contractVersion" : "0.4.0",
-  "contractFingerprint" : "b64f70fb8d078aa841b491218b69275f3e37d8e27b75ed1c7bbd498f9c2b5b1f",
-  "lastDiscoveredAt" : "2026-10-06T23:01:16.267741548Z",
+  "contractFingerprint" : "61aec67d5799b24f1e6d9b7d02bbc87c959a41c71855b799a183b6c42f7eadf9",
+  "lastDiscoveredAt" : "2026-10-07T03:08:13.758480768Z",
   "stale" : false,
   "discoveryError" : null
 }, {
@@ -443,8 +443,8 @@
     "reference" : "#/components/schemas/Student"
   },
   "contractVersion" : "0.4.0",
-  "contractFingerprint" : "f0bc84c25a942e3c7099c483405840379d0c240b74625ff52b04355c3d1af860",
-  "lastDiscoveredAt" : "2026-10-06T23:01:16.267741548Z",
+  "contractFingerprint" : "a51e66cb02f7d4849c044d3032c6dffd075bd1031f62155898c5b2bb63ca6c1c",
+  "lastDiscoveredAt" : "2026-10-07T03:08:13.758480768Z",
   "stale" : false,
   "discoveryError" : null
 }, {
@@ -545,8 +545,8 @@
     "reference" : "#/components/schemas/Professor"
   },
   "contractVersion" : "0.4.0",
-  "contractFingerprint" : "47ec42cb8deace31ff3a1bcf1ef0baac8ec5f4a238b085fe4a6d4041d70e6701",
-  "lastDiscoveredAt" : "2026-10-06T23:01:16.267741548Z",
+  "contractFingerprint" : "a51f5b03eda4def2b702958f5accff226bb0bd010d28dd2c8038c57ea45284bc",
+  "lastDiscoveredAt" : "2026-10-07T03:08:13.758480768Z",
   "stale" : false,
   "discoveryError" : null
 } ]

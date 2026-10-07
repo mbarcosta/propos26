@@ -291,6 +291,21 @@ public class PpgApiController {
         return ResponseEntity.ok(store.dissertationDocumentVersions(defenseId));
     }
 
+    @GetMapping("/dissertations")
+    public List<DissertationDocument> dissertations() {
+        return store.dissertationDocuments();
+    }
+
+    @GetMapping("/dissertations/{documentId}/download")
+    public ResponseEntity<Resource> downloadDissertationVersion(@PathVariable String documentId) {
+        return dissertationFile(documentId, false);
+    }
+
+    @GetMapping("/dissertations/{documentId}/view")
+    public ResponseEntity<Resource> viewDissertationVersion(@PathVariable String documentId) {
+        return dissertationFile(documentId, true);
+    }
+
     @GetMapping("/defenses/{defenseId}/dissertation/download")
     public ResponseEntity<Resource> downloadDissertation(@PathVariable Long defenseId) {
         if (store.defense(defenseId).isEmpty()) {
@@ -305,6 +320,23 @@ public class PpgApiController {
                                     .filename(document.getFileName())
                                     .build()
                                     .toString())
+                            .body(resource);
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private ResponseEntity<Resource> dissertationFile(String documentId, boolean inline) {
+        return store.dissertationDocument(documentId)
+                .map(document -> {
+                    Resource resource = dissertationStorageService.load(document);
+                    ContentDisposition disposition = (inline
+                            ? ContentDisposition.inline()
+                            : ContentDisposition.attachment())
+                            .filename(document.getFileName())
+                            .build();
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(document.getContentType()))
+                            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                             .body(resource);
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());

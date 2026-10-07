@@ -1,10 +1,4 @@
 services:
-  camunda7:
-    image: camunda/camunda-bpm-platform:run-latest
-    container_name: propos26-camunda7
-    expose:
-      - "8080"
-
   ade:
     build: ./platform/automation-development-environment
     container_name: propos26-ade
@@ -12,7 +6,7 @@ services:
       - "${ADE_PORT:-8070}:8070"
     environment:
       SERVER_PORT: 8070
-      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://host.docker.internal:8080/engine-rest}
       CIR_BASE_URL: ${CIR_BASE_URL:-http://cir:8082}
       GMS_BASE_URL: ${GMS_BASE_URL:-http://gms:8081}
       PPG_MANAGEMENT_OPENAPI_URL: ${PPG_MANAGEMENT_OPENAPI_URL:-http://ppg-management:8090/v3/api-docs}
@@ -20,7 +14,6 @@ services:
     volumes:
       - ./platform/automation-development-environment/data:/data
     depends_on:
-      - camunda7
       - cir
       - gms
       - ppg-management
@@ -45,12 +38,14 @@ services:
       - "${GMS_PORT:-8081}:8081"
     environment:
       SERVER_PORT: 8081
+      APP_MAIL_ATTACHMENT_DIRECTORY: /attachments
       GMS_MAIL_USERNAME: ${GMS_MAIL_USERNAME:-change-me}
       GMS_MAIL_PASSWORD: ${GMS_MAIL_PASSWORD:-change-me}
       GMS_MAIL_SSL_TRUST: ${GMS_MAIL_SSL_TRUST:-imap.gmail.com}
       APP_BINDINGS_FILE: ${GMS_BINDINGS_FILE:-/config/bindings.json}
     volumes:
       - ./services/email-gateway-service/data:/config
+      - ./services/email-gateway-service/data/attachments:/attachments
 
   cir:
     build: ./services/cir-service
@@ -59,14 +54,13 @@ services:
       - "${CIR_PORT:-8082}:8082"
     environment:
       SERVER_PORT: 8082
-      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://host.docker.internal:8080/engine-rest}
       GMS_BASE_URL: ${GMS_BASE_URL:-http://gms:8081}
       CIR_ROUTES_FILE: ${CIR_ROUTES_FILE:-/config/routes.json}
       CIR_EXTRACTIONS_FILE: ${CIR_EXTRACTIONS_FILE:-/config/extractions.json}
     volumes:
       - ./services/cir-service/data:/config
     depends_on:
-      - camunda7
       - gms
 
   automation-workers:
@@ -76,7 +70,7 @@ services:
       - "${WORKERS_PORT:-8091}:8091"
     environment:
       SERVER_PORT: 8091
-      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://camunda7:8080/engine-rest}
+      CAMUNDA_BASE_URL: ${CAMUNDA_BASE_URL:-http://host.docker.internal:8080/engine-rest}
       WORKER_ID: propos26-automation-workers
       PPG_MANAGEMENT_BASE_URL: ${PPG_MANAGEMENT_BASE_URL:-http://host.docker.internal:8090}
       MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-smtp.gmail.com}
@@ -85,5 +79,5 @@ services:
       MAIL_SMTP_PASSWORD: ${MAIL_SMTP_PASSWORD:-${GMS_MAIL_PASSWORD:-change-me}}
       MAIL_FROM: ${MAIL_FROM:-${GMS_MAIL_USERNAME:-change-me}}
       MAIL_SEND_ENABLED: ${MAIL_SEND_ENABLED:-true}
-    depends_on:
-      - camunda7
+    volumes:
+      - ./services/email-gateway-service/data/attachments:/attachments

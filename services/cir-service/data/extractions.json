@@ -46,5 +46,11 @@
       "label" : "role",
       "properties" : [ ]
     } ]
+  }, {
+    "name" : "file",
+    "type" : "File",
+    "required" : true,
+    "label" : "file",
+    "properties" : [ ]
   } ]
 } ]

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.ifes.cir.client.CamundaClient;
 import br.ifes.cir.client.GmsClient;
@@ -46,6 +47,7 @@ import br.ifes.cir.domain.store.ProcessedMessageStore;
  */
 @Service
 public class CirService {
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     /**
      * Cliente de comunicação com o GMS.
@@ -322,6 +324,13 @@ public class CirService {
             return camundaClient.booleanVar(booleanValue);
         }
 
+        if (value instanceof Map<?, ?> || value instanceof List<?>) {
+            try {
+                return camundaClient.stringVar(JSON.writeValueAsString(value));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Could not serialize structured process variable", e);
+            }
+        }
         return camundaClient.stringVar(value == null ? null : String.valueOf(value));
     }
 }
